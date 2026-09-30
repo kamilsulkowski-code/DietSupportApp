@@ -16,7 +16,7 @@ if not page.exists():
 content = page.read_text(encoding="utf-8")
 Validator().feed(content)
 
-for required in ("id=\"calculator\"", "Ułóż mój plan", "Lista zakupów"):
+for required in ("id=\"settingsForm\"", "id=\"mealDetails\"", "id=\"categories\"", "Lista zakupowa"):
     if required not in content:
         sys.exit(f"Brakuje wymaganej części strony: {required}")
 
