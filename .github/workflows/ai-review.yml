@@ -1,0 +1,53 @@
+name: AI review pull requestu
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Numer Pull Requesta do sprawdzenia
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz diff PR-a
+        id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/pulls/${{ inputs.pr_number }}" \
+            -H 'Accept: application/vnd.github.v3.diff' > /tmp/pr.diff
+          {
+            echo 'diff<<EOF'
+            head -c 50000 /tmp/pr.diff
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+      - name: Poproś AI o przegląd
+        id: ai
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DIFF: ${{ steps.diff.outputs.diff }}
+        run: |
+          test -n "$OPENAI_API_KEY"
+          jq -n --arg diff "$DIFF" '{model:"gpt-4.1-mini",input:[{role:"system",content:"Jesteś recenzentem kodu. Odpowiedz po polsku. Wypisz wyłącznie konkretne błędy, ryzyka i sugerowane testy. Jeśli nie ma uwag, napisz: Brak krytycznych uwag."},{role:"user",content:$diff}]}' > /tmp/request.json
+          curl --fail-with-body https://api.openai.com/v1/responses \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d @/tmp/request.json > /tmp/response.json
+          jq -r '.output[] | select(.type == "message") | .content[] | select(.type == "output_text") | .text' /tmp/response.json > /tmp/review.txt
+          {
+            echo 'review<<EOF'
+            cat /tmp/review.txt
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+      - name: Dodaj komentarz do PR-a
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW: ${{ steps.ai.outputs.review }}
+        run: gh pr comment "${{ inputs.pr_number }}" --repo "${{ github.repository }}" --body "$REVIEW"
