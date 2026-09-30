@@ -34,3 +34,14 @@ Raz w miesiącu sprawdź:
 - czy link produkcyjny jest dostępny;
 - czy klucz API i użycie API są zgodne z oczekiwaniami;
 - czy zgłoszenia `bug` i `maintenance` mają właściciela oraz priorytet.
+
+## Utrzymanie Supabase
+
+Raz w miesiącu sprawdź:
+
+- czy tabela `profiles` ma włączone RLS i trzy polityki ograniczające dostęp do właściciela rekordu;
+- czy adres produkcyjny jest nadal na liście **Authentication → URL Configuration → Redirect URLs**;
+- liczbę błędów `over_email_send_rate_limit` w logach Auth;
+- konfigurację SMTP i reputację domeny nadawczej, gdy logowanie jest dostępne dla użytkowników.
+
+Wbudowany dostawca e-mail Supabase ma limit 2 wiadomości na godzinę dla całego projektu. To limit dostawcy, a nie błąd aplikacji. W środowisku produkcyjnym należy użyć własnego SMTP.
