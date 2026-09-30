@@ -1,0 +1,32 @@
+name: Zgłoszenie błędu
+description: Zgłoś problem w aplikacji Forma
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: textarea
+    attributes:
+      label: Co się stało?
+      description: Opisz faktyczny rezultat.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Jak odtworzyć problem?
+      placeholder: |
+        1. Otwórz stronę
+        2. Wpisz...
+        3. Wybierz...
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Oczekiwany rezultat
+    validations:
+      required: true
+  - type: dropdown
+    attributes:
+      label: Urządzenie
+      options: [Telefon, Komputer, Tablet]
+  - type: input
+    attributes:
+      label: Przeglądarka i wersja
