@@ -36,6 +36,7 @@
 const supabaseConfig=window.FORMA_SUPABASE||{};
 const db=supabaseConfig.url&&supabaseConfig.anonKey&&window.supabase?window.supabase.createClient(supabaseConfig.url,supabaseConfig.anonKey):null;
 let currentUser=null;
+let authBusy=false;
 const meals=[
  {icon:"🥣",time:"07:30",name:"Owsianka z jogurtem i owocami",kcal:510,protein:31,ingredients:["płatki owsiane — 70 g","skyr naturalny — 200 g","borówki — 100 g","banan — 120 g","migdały — 15 g"],prep:"Wymieszaj płatki ze skyrem. Dodaj owoce i migdały."},
  {icon:"🥗",time:"12:30",name:"Kurczak z ryżem i warzywami",kcal:670,protein:52,ingredients:["pierś z kurczaka — 180 g","ryż basmati — 80 g","brokuł — 150 g","papryka — 100 g","oliwa — 10 g"],prep:"Ugotuj ryż. Kurczaka usmaż na oliwie, dodaj warzywa i podaj razem."},
@@ -49,8 +50,8 @@ let checks=JSON.parse(localStorage.getItem("forma-shopping")||"{}");
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 async function syncToCloud(){if(!db||!currentUser)return;const {error}=await db.from("profiles").upsert({id:currentUser.id,settings:state,shopping_state:checks,updated_at:new Date().toISOString()});if(error)toast("Nie udało się zsynchronizować danych")}
 async function restoreFromCloud(){if(!db||!currentUser)return;const {data,error}=await db.from("profiles").select("settings,shopping_state").eq("id",currentUser.id).maybeSingle();if(error){toast("Nie udało się pobrać danych");return}if(data){state={...defaultSettings,...data.settings};checks=data.shopping_state||{};localStorage.setItem("forma-settings",JSON.stringify(state));localStorage.setItem("forma-shopping",JSON.stringify(checks));render();toast("Dane zsynchronizowane")}else await syncToCloud()}
-async function requestLogin(){if(!db){toast("Dodaj dane projektu Supabase w supabase-config.js");return}const email=prompt("Podaj e-mail. Wyślemy bezpieczny link do logowania.");if(!email)return;const {error}=await db.auth.signInWithOtp({email,options:{emailRedirectTo:location.href}});toast(error?"Nie udało się wysłać linku":"Sprawdź skrzynkę e-mail")}
-function renderAccount(){const e=$("#accountButton");if(!e)return;e.textContent=currentUser?"Wyloguj · "+currentUser.email:"Zaloguj się";e.title=currentUser?"Wyloguj":"Zaloguj się, aby synchronizować dane"}
+async function requestLogin(){if(!db){toast("Dodaj dane projektu Supabase w supabase-config.js");return}if(authBusy)return;const entered=prompt("Podaj e-mail. Wyślemy bezpieczny link do logowania.");const email=(entered||"").trim().toLowerCase();if(!email)return;authBusy=true;renderAccount();const redirectUrl=location.origin+location.pathname;const {error}=await db.auth.signInWithOtp({email,options:{emailRedirectTo:redirectUrl,shouldCreateUser:true}});authBusy=false;renderAccount();toast(error?"Nie udało się wysłać linku: "+error.message:"Sprawdź skrzynkę e-mail")}
+function renderAccount(){const e=$("#accountButton");if(!e)return;e.disabled=authBusy;e.textContent=authBusy?"Wysyłanie linku…":currentUser?"Wyloguj · "+currentUser.email:"Zaloguj się";e.title=currentUser?"Wyloguj":"Zaloguj się, aby synchronizować dane"}
 async function initAuth(){if(!db){renderAccount();return}const {data:{session}}=await db.auth.getSession();currentUser=session?.user||null;renderAccount();if(currentUser)await restoreFromCloud();db.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null;renderAccount();if(currentUser)restoreFromCloud()})}
 function goalName(g){return {cut:"Redukcja",gain:"Budowa mięśni",keep:"Utrzymanie"}[g]}
 function targetKcal(){if(state.calories)return Number(state.calories);const base=Math.round(Number(state.weight)*(state.goal==="gain"?34:state.goal==="cut"?28:31));return Math.max(1500,base)}
@@ -70,7 +71,7 @@ $("#categories").addEventListener("change",e=>{if(e.target.dataset.item){checks[
 $("#completeShop").addEventListener("click",()=>{Object.values(shopping).flat().forEach(x=>checks[x[1]]=true);localStorage.setItem("forma-shopping",JSON.stringify(checks));syncToCloud();renderShopping();toast("Lista oznaczona jako kupiona")});
 $("#generateBtn").addEventListener("click",()=>{render();toast("Plan odświeżony według Twoich założeń");setTimeout(()=>navigate("day"),450)});
 document.body.insertAdjacentHTML("beforeend","<style>.account{position:fixed;right:20px;top:18px;z-index:7;border:1px solid var(--line);background:#fff;border-radius:999px;padding:10px 13px;color:var(--ink);font-size:.78rem;font-weight:800;box-shadow:var(--shadow)}@media(max-width:560px){.account{right:14px;top:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}</style><button class='account' id='accountButton' type='button'></button>");
-$("#accountButton").addEventListener("click",async()=>{if(currentUser){await db.auth.signOut();currentUser=null;renderAccount();toast("Wylogowano")}else requestLogin()});
+$("#accountButton").addEventListener("click",async()=>{if(!db){requestLogin();return}if(currentUser){authBusy=true;renderAccount();const {error}=await db.auth.signOut({scope:"local"});authBusy=false;if(error){renderAccount();toast("Nie udało się wylogować: "+error.message);return}currentUser=null;renderAccount();toast("Wylogowano")}else requestLogin()});
 render();
 initAuth();
 </script>
