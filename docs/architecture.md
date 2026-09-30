@@ -2,14 +2,18 @@
 
 ## Obecny układ
 
-Forma jest statyczną aplikacją jednostronicową.
+Forma jest statyczną aplikacją jednostronicową z zewnętrzną usługą danych Supabase.
 
 ```text
 Przeglądarka
   └── dist/index.html
       ├── HTML: formularz i widoki wyników
       ├── CSS: responsywny interfejs
-      └── JavaScript: kalkulacje, plan i lista zakupów
+      └── JavaScript: kalkulacje, plan, zakupy i klient Supabase
+
+Supabase
+  ├── Auth: jednorazowe linki e-mail
+  └── profiles: ustawienia planu i stan zakupów
 
 GitHub Actions
   ├── kontrola jakości
@@ -19,9 +23,10 @@ GitHub Actions
 
 ## Dane i prywatność
 
-- Dane wpisane w formularzu są przetwarzane wyłącznie w przeglądarce.
-- Aplikacja nie ma bazy danych ani backendu.
-- Nie przechowujemy danych zdrowotnych ani danych osobowych użytkowników.
+- Przed zalogowaniem dane pozostają lokalnie w przeglądarce.
+- Po zalogowaniu ustawienia planu i stan listy zakupów są zapisywane w tabeli `profiles` w Supabase.
+- RLS ogranicza odczyt i zapis rekordu do zalogowanego właściciela.
+- Aplikacja nie zapisuje w bazie haseł ani kluczy API.
 
 ## Algorytm
 
@@ -36,3 +41,5 @@ Brak zależności budowanych lokalnie. Strona korzysta z fontów Google Fonts w 
 ## Sekrety
 
 `OPENAI_API_KEY` istnieje wyłącznie jako zaszyfrowany sekret GitHub Actions. Służy tylko do ręcznie uruchamianego workflow AI review i nie może trafić do kodu ani do `dist/index.html`.
+
+Supabase `publishable/anon` key jest używany przez klienta przeglądarkowego. Klucz `service_role` jest administracyjny i nie może trafić do repozytorium, GitHub Pages ani konfiguracji `dist/supabase-config.js`.
