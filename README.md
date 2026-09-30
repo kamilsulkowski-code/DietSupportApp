@@ -1,6 +1,6 @@
 # Forma — plan żywieniowy
 
-Statyczna aplikacja do ułożenia przykładowego jadłospisu z obliczeniem kalorii, białka i listą zakupów.
+Aplikacja do ułożenia przykładowego jadłospisu z obliczeniem kalorii, białka i listą zakupów.
 
 ## CI/CD
 
