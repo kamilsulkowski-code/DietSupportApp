@@ -15,8 +15,8 @@ type Settings = {
 };
 
 type Ingredient = { name: string; category: string; amount: number; unit: string; biedronka: boolean };
-type Meal = { name: string; time: string; kcal: number; protein_g: number; ingredients: Ingredient[]; preparation: string };
-type PlanDay = { date: string; total_kcal: number; total_protein_g: number; meals: Meal[] };
+type Meal = { name: string; time: string; kcal: number; protein_g: number; fat_g: number; carbs_g: number; ingredients: Ingredient[]; preparation: string };
+type PlanDay = { date: string; total_kcal: number; total_protein_g: number; total_fat_g: number; total_carbs_g: number; meals: Meal[] };
 type Promotion = { ingredient_name: string; product: string; offer: string; verified: boolean; source_url: string; valid_from: string; valid_to: string };
 type AiResponse = { status?: string; output_text?: string; output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string; annotations?: Array<{ url?: string }> }>; action?: { sources?: Array<{ url?: string }> } }>; incomplete_details?: { reason?: string } };
 
@@ -69,10 +69,11 @@ function validateDays(value: unknown, start: string, dayCount: number, mealCount
       return {
         name: textField(meal.name, "nazwa posiłku"), time: textField(meal.time, "godzina"),
         kcal: numericField(meal.kcal), protein_g: numericField(meal.protein_g, true),
+        fat_g: numericField(meal.fat_g, true), carbs_g: numericField(meal.carbs_g, true),
         ingredients: meal.ingredients.map(normalizeIngredient), preparation: textField(meal.preparation, "przygotowanie"),
       };
     });
-    return { date: day.date as string, meals, total_kcal: roundAmount(meals.reduce((sum, meal) => sum + meal.kcal, 0)), total_protein_g: roundAmount(meals.reduce((sum, meal) => sum + meal.protein_g, 0)) };
+    return { date: day.date as string, meals, total_kcal: roundAmount(meals.reduce((sum, meal) => sum + meal.kcal, 0)), total_protein_g: roundAmount(meals.reduce((sum, meal) => sum + meal.protein_g, 0)), total_fat_g: roundAmount(meals.reduce((sum, meal) => sum + meal.fat_g, 0)), total_carbs_g: roundAmount(meals.reduce((sum, meal) => sum + meal.carbs_g, 0)) };
   });
 }
 
@@ -180,7 +181,7 @@ Deno.serve(async (req) => {
   const instructions = `Wygeneruj polski jadłospis na ${Number(settings.shopDays)} dni od ${date(start)} do ${date(end)}. Cel: ${settings.goal}; dziennie około ${kcal} kcal oraz ${protein} g białka; dokładnie ${settings.mealCount} posiłków dziennie.
 Składniki muszą być dostępne w Biedronce. Każdy składnik to obiekt {name,category,amount,unit,biedronka:true}. amount to liczba oznaczająca ilość DLA JEDNEGO POSIŁKU, nie całego cyklu. unit wyłącznie g, kg, ml, l lub szt. Wagi dotyczą części jadalnych (dla konserw po odsączeniu, dla ryżu i makaronu przed gotowaniem). Używaj zawsze tej samej konkretnej polskiej nazwy i jednostki dla danego składnika we wszystkich posiłkach. Bez alternatyw, ukośników, opcjonalnych składników, łyżek, porcji i opakowań; np. oliwa w ml, przyprawy w g, chleb w g. NIE twórz shopping_items: serwer sam zsumuje składniki wszystkich dni.
 Sprawdź aktualne promocje na https://zakupy.biedronka.pl/polecane/promocje/ i wykorzystaj pasujące produkty w posiłkach. promotions ma zawierać WYŁĄCZNIE oferty żywności użytej w jadłospisie. Każda oferta musi zawierać ingredient_name identyczne z name odpowiedniego składnika, product (pełna nazwa produktu sklepu), offer, verified:true, source_url (odwiedzony oficjalny URL), valid_from i valid_to (YYYY-MM-DD). Musi być ważna w dniu zakupów ${date(start)}. Bez potwierdzenia źródła i dat zwróć pustą tablicę, nie zgaduj. Nie dodawaj chemii, kosmetyków ani karmy.
-Pole preparation ogranicz do jednego krótkiego zdania. Zwróć wyłącznie jeden obiekt JSON bez Markdown, cytowań ani tekstu poza JSON: {"days":[{"date":"YYYY-MM-DD","meals":[{"name":"...","time":"08:00","kcal":700,"protein_g":40,"ingredients":[{"name":"Filet z piersi kurczaka","category":"Mięso i ryby","amount":220,"unit":"g","biedronka":true}],"preparation":"..."}]}],"promotions":[{"ingredient_name":"Filet z piersi kurczaka","product":"...","offer":"...","verified":true,"source_url":"https://zakupy.biedronka.pl/...","valid_from":"YYYY-MM-DD","valid_to":"YYYY-MM-DD"}]}.`;
+Podaj dla każdego posiłku szacunkowe kcal, protein_g, fat_g (tłuszcze) i carbs_g (węglowodany), liczby nieujemne, dla podanych ilości składników. Pole preparation ogranicz do jednego krótkiego zdania. Zwróć wyłącznie jeden obiekt JSON bez Markdown, cytowań ani tekstu poza JSON: {"days":[{"date":"YYYY-MM-DD","meals":[{"name":"...","time":"08:00","kcal":700,"protein_g":40,"fat_g":20,"carbs_g":90,"ingredients":[{"name":"Filet z piersi kurczaka","category":"Mięso i ryby","amount":220,"unit":"g","biedronka":true}],"preparation":"..."}]}],"promotions":[{"ingredient_name":"Filet z piersi kurczaka","product":"...","offer":"...","verified":true,"source_url":"https://zakupy.biedronka.pl/...","valid_from":"YYYY-MM-DD","valid_to":"YYYY-MM-DD"}]}.`;
   const aiResponse = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
@@ -221,7 +222,7 @@ Pole preparation ogranicz do jednego krótkiego zdania. Zwróć wyłącznie jede
 
   const { data: plan, error: planError } = await admin.from("meal_plans").insert({
     user_id: user.id, cycle_start: date(start), cycle_end: date(end), target_kcal: kcal,
-    target_protein_g: protein, content: { schema_version: 2, days }, model: "gpt-5-mini",
+    target_protein_g: protein, content: { schema_version: 3, days }, model: "gpt-5-mini",
   }).select().single();
   if (planError) return Response.json({ error: "Nie udało się zapisać jadłospisu." }, { status: 500, headers: corsHeaders });
   const { error: shoppingError } = await admin.from("shopping_cycles").insert({

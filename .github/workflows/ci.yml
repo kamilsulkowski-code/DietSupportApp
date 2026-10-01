@@ -20,3 +20,7 @@ jobs:
           node-version: '24'
       - name: Sprawdź generator, zakupy, promocje i parser OpenAI
         run: node --test scripts/generate_plan.test.mjs
+      - name: Sprawdź formularz logowania kodem (bez maili i sieci)
+        run: node --test scripts/auth_otp.test.mjs
+      - name: Sprawdź kryteria jadłospisu dnia
+        run: node --test scripts/task3_acceptance.test.mjs

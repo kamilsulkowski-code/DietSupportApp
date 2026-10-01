@@ -48,10 +48,20 @@ ponownie przez liczbę dni i nie używa pola `shopping_items` wygenerowanego prz
 Nieznane jednostki, alternatywy i niezgodne jednostki dla tego samego produktu
 są odrzucane przed zapisem. Lista oznacza ilości do zużycia, nie liczbę opakowań.
 
-Nowe rekordy mają `meal_plans.content.schema_version = 2`. Starsze plany nadal
+Nowe rekordy mają `meal_plans.content.schema_version = 3`. Format 3 zachowuje
+sumowanie zakupów z formatu 2 i dodaje do każdego posiłku wymagane, nieujemne
+`fat_g` i `carbs_g`. Sumy kalorii, białka, tłuszczów i węglowodanów są obliczane
+przez serwer z posiłków. Makroskładniki są szacunkami modelu, nie pomiarami.
+Nie wymaga to migracji SQL: zawartość planu jest zapisywana jako JSONB.
+
+Starsze plany nadal
 można odczytać, ale ich historyczne ilości nie są automatycznie naprawiane:
 tekstowe składniki mogą być niejednoznaczne. Po wdrożeniu należy wygenerować
 nowy plan, aby uzyskać poprawnie sumowane zakupy.
+
+Interfejs nie uzupełnia brakującego makro historycznych planów zerami:
+pokazuje brak danych i potrzebę wygenerowania nowego planu. Promocje z obu
+mierzalnych formatów 2 i 3 pozostają dostępne.
 
 Parser czyta fragmenty `output[].content[]` typu `output_text`, a nie wyłącznie
 pole pomocnicze SDK `response.output_text`. Niekompletne odpowiedzi są odrzucane.

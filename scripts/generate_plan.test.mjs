@@ -17,13 +17,17 @@ function runtime(overrides = {}) {
 const { api } = runtime();
 const plain = value => JSON.parse(JSON.stringify(value));
 const ingredient = (name, amount, unit = 'g') => ({ name, amount, unit, category: 'Mięso i ryby', biedronka: true });
-const meal = ingredients => ({ name: 'Posiłek', time: '12:00', kcal: 700, protein_g: 40, preparation: 'Ugotuj składniki.', ingredients });
+const meal = ingredients => ({ name: 'Posiłek', time: '12:00', kcal: 700, protein_g: 40, fat_g: 20, carbs_g: 90, preparation: 'Ugotuj składniki.', ingredients });
 const days = [
   { date: '2026-10-01', meals: [meal([ingredient('Filet z piersi kurczaka', 220)])] },
   { date: '2026-10-02', meals: [meal([ingredient('Filet z łososia', 180)])] },
   { date: '2026-10-03', meals: [meal([ingredient('Ryż biały', 0.12, 'kg')])] },
 ];
 const validated = () => api.validateDays(structuredClone(days), '2026-10-01', 3, 1);
+test('pełne makro jest wymagane, a sumy dnia są liczone z posiłków',()=>{
+ const result=validated();assert.equal(result[0].total_fat_g,20);assert.equal(result[0].total_carbs_g,90);
+ for(const value of [undefined,-1,'20',NaN]){const invalid=structuredClone(days);invalid[0].meals[0].fat_g=value;assert.throws(()=>api.validateDays(invalid,'2026-10-01',3,1))}
+});
 const official = 'https://zakupy.biedronka.pl/polecane/promocje/';
 const response = text => ({ status: 'completed', output: [
   { type: 'reasoning', summary: [] },
@@ -113,7 +117,7 @@ test('endpoint zapisuje wyliczone zakupy, ignoruje shopping_items AI', async () 
   });
   const result = await context.handler(new Request('https://example.test', { method: 'POST', headers: { Authorization: 'Bearer test' } }));
   assert.equal(result.status, 200);
-  assert.equal(saved.meal_plans.content.schema_version, 2);
+  assert.equal(saved.meal_plans.content.schema_version, 3);
   assert.equal(saved.shopping_cycles.plan_id, 'plan-id');
   assert.equal(saved.shopping_cycles.items.find(x => x.name === 'Filet z piersi kurczaka').amount, 220);
   assert.equal(saved.shopping_cycles.items.find(x => x.name === 'Filet z łososia').amount, 180);
