@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
   const end = new Date(start); end.setUTCDate(start.getUTCDate() + Number(settings.shopDays) - 1);
   const date = (d: Date) => d.toISOString().slice(0, 10);
 
-  const instructions = `Jesteś polskim dietetykiem i planistą zakupów. Wygeneruj plan na ${Number(settings.shopDays)} dni od ${date(start)} do ${date(end)}. Cel: ${settings.goal}; dziennie dokładnie około ${kcal} kcal oraz ${protein} g białka; ${settings.mealCount} posiłków dziennie. Składniki muszą być dostępne w Biedronce. Najpierw użyj narzędzia wyszukiwania, aby sprawdzić aktualne promocje wyłącznie na https://zakupy.biedronka.pl/polecane/promocje/ . Używaj tylko ofert, które udało się zweryfikować w tym źródle; gdy nie udało się znaleźć promocji, zwróć pustą tablicę promotions i pusty URL. Ilości zakupowe policz dla całego cyklu. Zwróć wyłącznie JSON o strukturze {days:[{date,total_kcal,total_protein_g,meals:[{name,time,kcal,protein_g,ingredients,preparation}]}],shopping_items:[{category,name,amount,unit,biedronka}],promotions:[{product,offer,verified}],promotion_source_url:string}.`;
+  const instructions = `Jesteś polskim dietetykiem i planistą zakupów. Wygeneruj plan na ${Number(settings.shopDays)} dni od ${date(start)} do ${date(end)}. Cel: ${settings.goal}; dziennie dokładnie około ${kcal} kcal oraz ${protein} g białka; ${settings.mealCount} posiłków dziennie. Składniki muszą być dostępne w Biedronce. Najpierw użyj narzędzia wyszukiwania, aby sprawdzić aktualne promocje wyłącznie na https://zakupy.biedronka.pl/polecane/promocje/ . Używaj tylko ofert, które udało się zweryfikować w tym źródle; gdy nie udało się znaleźć promocji, zwróć pustą tablicę promotions i pusty URL. Ilości zakupowe policz dla całego cyklu. Zwróć wyłącznie jeden obiekt JSON — bez Markdown, komentarzy, tekstu przed lub po obiekcie ani cytowań w treści JSON — o strukturze {days:[{date,total_kcal,total_protein_g,meals:[{name,time,kcal,protein_g,ingredients,preparation}]}],shopping_items:[{category,name,amount,unit,biedronka}],promotions:[{product,offer,verified}],promotion_source_url:string}.`;
   const aiResponse = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
@@ -76,7 +76,9 @@ Deno.serve(async (req) => {
       .trim()
       .replace(/^```(?:json)?\s*/i, "")
       .replace(/\s*```$/, "");
-    generated = JSON.parse(output);
+    const start = output.indexOf("{");
+    const end = output.lastIndexOf("}");
+    generated = JSON.parse(start >= 0 && end >= start ? output.slice(start, end + 1) : output);
   } catch { return Response.json({ error: "Generator zwrócił nieprawidłowy plan." }, { status: 502, headers: corsHeaders }); }
   if (!Array.isArray(generated.days) || !Array.isArray(generated.shopping_items) || !Array.isArray(generated.promotions)) return Response.json({ error: "Generator zwrócił niepełny plan." }, { status: 502, headers: corsHeaders });
 
