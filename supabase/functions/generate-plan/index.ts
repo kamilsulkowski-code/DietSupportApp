@@ -60,6 +60,13 @@ Deno.serve(async (req) => {
   if (!aiResponse.ok) {
     const detail = await aiResponse.text();
     console.error("OpenAI API error", aiResponse.status, detail);
+    if (aiResponse.status === 429) {
+      const quotaExceeded = /insufficient_quota|billing_hard_limit_reached/i.test(detail);
+      const error = quotaExceeded
+        ? "Brak dostępnego limitu API OpenAI. Doładuj środki lub zwiększ limit rozliczeniowy w panelu OpenAI."
+        : "Osiągnięto chwilowy limit zapytań OpenAI. Odczekaj minutę i spróbuj ponownie.";
+      return Response.json({ error }, { status: 429, headers: corsHeaders });
+    }
     return Response.json({ error: `Generator AI nie odpowiedział. Kod OpenAI: ${aiResponse.status}` }, { status: 502, headers: corsHeaders });
   }
   const response = await aiResponse.json();
