@@ -15,3 +15,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Sprawdź strukturę aplikacji
         run: python3 scripts/validate_site.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Sprawdź generator, zakupy, promocje i parser OpenAI
+        run: node --test scripts/generate_plan.test.mjs
