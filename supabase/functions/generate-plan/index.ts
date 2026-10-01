@@ -46,13 +46,15 @@ Deno.serve(async (req) => {
   const end = new Date(start); end.setUTCDate(start.getUTCDate() + Number(settings.shopDays) - 1);
   const date = (d: Date) => d.toISOString().slice(0, 10);
 
-  const instructions = `Jesteś polskim dietetykiem i planistą zakupów. Wygeneruj plan na ${Number(settings.shopDays)} dni od ${date(start)} do ${date(end)}. Cel: ${settings.goal}; dziennie dokładnie około ${kcal} kcal oraz ${protein} g białka; ${settings.mealCount} posiłków dziennie. Składniki muszą być dostępne w Biedronce. Najpierw użyj narzędzia wyszukiwania, aby sprawdzić aktualne promocje wyłącznie na https://zakupy.biedronka.pl/polecane/promocje/ . Używaj tylko ofert, które udało się zweryfikować w tym źródle; gdy nie udało się znaleźć promocji, zwróć pustą tablicę promotions i pusty URL. Ilości zakupowe policz dla całego cyklu. Zwróć wyłącznie jeden obiekt JSON — bez Markdown, komentarzy, tekstu przed lub po obiekcie ani cytowań w treści JSON — o strukturze {days:[{date,total_kcal,total_protein_g,meals:[{name,time,kcal,protein_g,ingredients,preparation}]}],shopping_items:[{category,name,amount,unit,biedronka}],promotions:[{product,offer,verified}],promotion_source_url:string}.`;
+  const instructions = `Jesteś polskim dietetykiem i planistą zakupów. Wygeneruj plan na ${Number(settings.shopDays)} dni od ${date(start)} do ${date(end)}. Cel: ${settings.goal}; dziennie dokładnie około ${kcal} kcal oraz ${protein} g białka; ${settings.mealCount} posiłków dziennie. Składniki muszą być dostępne w Biedronce. Najpierw użyj narzędzia wyszukiwania, aby sprawdzić aktualne promocje wyłącznie na https://zakupy.biedronka.pl/polecane/promocje/ . Używaj tylko ofert, które udało się zweryfikować w tym źródle; gdy nie udało się znaleźć promocji, zwróć pustą tablicę promotions i pusty URL. Ilości zakupowe policz dla całego cyklu. Pole preparation ogranicz do jednego krótkiego zdania. Zwróć wyłącznie jeden obiekt JSON — bez Markdown, komentarzy, tekstu przed lub po obiekcie ani cytowań w treści JSON — o strukturze {days:[{date,total_kcal,total_protein_g,meals:[{name,time,kcal,protein_g,ingredients,preparation}]}],shopping_items:[{category,name,amount,unit,biedronka}],promotions:[{product,offer,verified}],promotion_source_url:string}.`;
   const aiResponse = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "gpt-5-mini",
       store: false,
+      reasoning: { effort: "low" },
+      max_output_tokens: 16000,
       tools: [{ type: "web_search" }],
       input: instructions,
     }),
@@ -70,6 +72,14 @@ Deno.serve(async (req) => {
     return Response.json({ error: `Generator AI nie odpowiedział. Kod OpenAI: ${aiResponse.status}` }, { status: 502, headers: corsHeaders });
   }
   const response = await aiResponse.json();
+  if (response.status !== "completed") {
+    console.error("Incomplete AI meal plan response", {
+      status: response.status,
+      reason: response.incomplete_details?.reason ?? null,
+      outputLength: String(response.output_text ?? "").length,
+    });
+    return Response.json({ error: "Generator AI nie ukończył odpowiedzi. Spróbuj ponownie." }, { status: 502, headers: corsHeaders });
+  }
   let generated: Record<string, unknown>;
   try {
     const output = String(response.output_text ?? "")
