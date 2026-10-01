@@ -55,7 +55,6 @@ Deno.serve(async (req) => {
       store: false,
       tools: [{ type: "web_search" }],
       input: instructions,
-      text: { format: { type: "json_object" } },
     }),
   });
   if (!aiResponse.ok) {
@@ -65,7 +64,13 @@ Deno.serve(async (req) => {
   }
   const response = await aiResponse.json();
   let generated: Record<string, unknown>;
-  try { generated = JSON.parse(response.output_text); } catch { return Response.json({ error: "Generator zwrócił nieprawidłowy plan." }, { status: 502, headers: corsHeaders }); }
+  try {
+    const output = String(response.output_text ?? "")
+      .trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "");
+    generated = JSON.parse(output);
+  } catch { return Response.json({ error: "Generator zwrócił nieprawidłowy plan." }, { status: 502, headers: corsHeaders }); }
   if (!Array.isArray(generated.days) || !Array.isArray(generated.shopping_items) || !Array.isArray(generated.promotions)) return Response.json({ error: "Generator zwrócił niepełny plan." }, { status: 502, headers: corsHeaders });
 
   const { data: plan, error: planError } = await admin.from("meal_plans").insert({
