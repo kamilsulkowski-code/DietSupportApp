@@ -13,7 +13,10 @@ Przeglądarka
 
 Supabase
   ├── Auth: jednorazowe linki e-mail
-  └── profiles: ustawienia planu i stan zakupów
+  ├── profiles: ustawienia planu i stan zakupów
+  ├── meal_plans: zapisane cykle jadłospisu AI
+  ├── shopping_cycles: zakupy i snapshot promocji dla cyklu
+  └── Edge Function generate-plan: bezpieczne wywołanie API OpenAI
 
 GitHub Actions
   ├── kontrola jakości
@@ -25,14 +28,16 @@ GitHub Actions
 
 - Przed zalogowaniem dane pozostają lokalnie w przeglądarce.
 - Po zalogowaniu ustawienia planu i stan listy zakupów są zapisywane w tabeli `profiles` w Supabase.
+- Wygenerowane przez AI jadłospisy i odpowiadające im cykle zakupowe są zapisywane osobno, aby plan można było odtworzyć dla konkretnego dnia.
 - RLS ogranicza odczyt i zapis rekordu do zalogowanego właściciela.
 - Aplikacja nie zapisuje w bazie haseł ani kluczy API.
 
-## Algorytm
+## Generator AI
 
-- Kalorie wynikają z masy ciała, liczby treningów oraz korekty celu.
-- Białko jest wyliczane jako 1,8 g/kg dla redukcji i utrzymania oraz 2 g/kg dla budowy mięśni.
-- Plan posiłków jest przykładowy i wybierany według celu.
+- Kalkulator oblicza cel kalorii i białka na podstawie ustawień użytkownika.
+- Funkcja `generate-plan` przekazuje te cele do API OpenAI, wymusza odpowiedź w schemacie JSON i zapisuje wynik po zweryfikowaniu sesji użytkownika.
+- Generator sprawdza oficjalną stronę promocji Biedronki i zapisuje snapshot wyłącznie zweryfikowanych ofert wraz z cyklem zakupowym.
+- Szczegóły wdrożenia są w `docs/ai-generator-setup.md`.
 
 ## Zależności
 
