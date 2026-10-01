@@ -68,6 +68,32 @@ test('kontrolowana jest liczba dni, posiłków i kolejność dat', () => {
   assert.equal(validated()[0].total_kcal, 700);
 });
 
+test('odrzucany jest skopiowany cały dzień, również niekolejny',()=>{
+ for(const index of [1,2]){
+  const input=structuredClone(days);input[index].meals=structuredClone(input[0].meals);
+  assert.throws(()=>api.validateDays(input,'2026-10-01',3,1),/ten sam zestaw dań/);
+ }
+});
+test('zmiana nazw, godzin, porcji i makro nie ukrywa duplikatu',()=>{
+ const input=structuredClone(days);input[1].meals=structuredClone(input[0].meals);
+ Object.assign(input[1].meals[0],{name:'Inny tytuł',time:'15:00',kcal:800,protein_g:50,fat_g:30,carbs_g:110});
+ input[1].meals[0].ingredients[0].amount=0.3;input[1].meals[0].ingredients[0].unit='kg';
+ input[1].meals[0].ingredients[0].name=' FILET Z PIERSI KURCZAKA ';
+ assert.throws(()=>api.validateDays(input,'2026-10-01',3,1),/ten sam zestaw dań/);
+});
+test('kolejność posiłków i składników nie ukrywa powielonego dnia',()=>{
+ const first=[meal([ingredient('Łosoś',180),ingredient('Ryż',80)]),meal([ingredient('Jaja',2,'szt')])];
+ const input=[{date:'2026-10-01',meals:first},{date:'2026-10-02',meals:structuredClone(first).reverse()}];
+ input[1].meals[1].ingredients.reverse();
+ assert.throws(()=>api.validateDays(input,'2026-10-01',2,2),/ten sam zestaw dań/);
+});
+test('jeden wspólny posiłek jest dozwolony, gdy pozostałe dania różnią się',()=>{
+ const breakfast=meal([ingredient('Płatki owsiane',60)]);
+ const input=days.map(day=>({...structuredClone(day),meals:[structuredClone(breakfast),structuredClone(day.meals[0])]}));
+ assert.equal(api.validateDays(input,'2026-10-01',3,2).length,3);
+ assert.equal(api.validateDays([input[0]],'2026-10-01',1,2).length,1);
+});
+
 test('parser odczytuje output po narzędziach i reasoning, wspiera fallback', () => {
   assert.deepEqual(plain(api.parseResponse(response('```json\n{"days":[]}\n```'))), { days: [] });
   assert.equal(api.responseText({ output: [{ content: [{ type: 'output_text', text: '{"a":' }, { type: 'output_text', text: '1}' }] }] }), '{"a":1}');
@@ -125,6 +151,20 @@ test('endpoint zapisuje wyliczone zakupy, ignoruje shopping_items AI', async () 
   assert.equal(saved.shopping_cycles.promotion_source_url, null);
   assert.equal(requestBody.include[0], 'web_search_call.action.sources');
   assert.deepEqual(requestBody.tools[0].filters.allowed_domains, ['zakupy.biedronka.pl']);
+  assert.match(requestBody.input,/Różnorodność jest wymagana/);
+});
+
+test('endpoint nie zapisuje planu ani zakupów po wykryciu powielonych dni',async()=>{
+ const settings={goal:'keep',weight:70,protein:2,mealCount:1,shopDays:3};let writes=0,requests=0;
+ const today=new Date().toISOString().slice(0,10);
+ const repeated=days.map((day,index)=>{const date=new Date(today+'T00:00:00Z');date.setUTCDate(date.getUTCDate()+index);return {...day,date:date.toISOString().slice(0,10),meals:structuredClone(days[0].meals)}});
+ const context=runtime({console:{error(){}},createClient:()=>({
+  auth:{getUser:async()=>({data:{user:{id:'owner'}}})},
+  from:()=>({select:()=>({eq:()=>({single:async()=>({data:{settings}})})}),insert:()=>{writes++;throw Error('Unexpected write')}}),
+ }),fetch:async()=>{requests++;return Response.json(response(JSON.stringify({days:repeated,promotions:[]})))}});
+ const result=await context.handler(new Request('https://example.test',{method:'POST',headers:{Authorization:'Bearer test'}}));
+ assert.equal(result.status,502);assert.match((await result.json()).error,/powielił jadłospis.*Plan nie został zapisany/);
+ assert.equal(writes,0);assert.equal(requests,1);
 });
 
 test('UI obsługuje stare tekstowe i nowe mierzalne składniki', () => {

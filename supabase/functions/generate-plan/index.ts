@@ -58,7 +58,7 @@ function normalizeIngredient(value: unknown): Ingredient {
 
 function validateDays(value: unknown, start: string, dayCount: number, mealCount: number): PlanDay[] {
   if (!Array.isArray(value) || value.length !== dayCount) throw new Error("Nieprawidłowa liczba dni jadłospisu.");
-  return value.map((entry, index) => {
+  const days = value.map((entry, index) => {
     const day = record(entry);
     const expected = new Date(start + "T00:00:00Z"); expected.setUTCDate(expected.getUTCDate() + index);
     if (day.date !== expected.toISOString().slice(0, 10)) throw new Error("Nieprawidłowe daty jadłospisu.");
@@ -75,6 +75,25 @@ function validateDays(value: unknown, start: string, dayCount: number, mealCount
     });
     return { date: day.date as string, meals, total_kcal: roundAmount(meals.reduce((sum, meal) => sum + meal.kcal, 0)), total_protein_g: roundAmount(meals.reduce((sum, meal) => sum + meal.protein_g, 0)), total_fat_g: roundAmount(meals.reduce((sum, meal) => sum + meal.fat_g, 0)), total_carbs_g: roundAmount(meals.reduce((sum, meal) => sum + meal.carbs_g, 0)) };
   });
+  validateDayVariety(days);
+  return days;
+}
+
+class DuplicateDayError extends Error {}
+
+// Compare dish compositions, not model-written titles, times or portion sizes.
+// Sorting preserves repeated dishes but ignores meal/ingredient ordering.
+function validateDayVariety(days: PlanDay[]) {
+  const seen = new Map<string, string>();
+  for (const day of days) {
+    const compositions = day.meals.map(meal =>
+      JSON.stringify([...new Set(meal.ingredients.map(item => normalizedName(item.name)))].sort())
+    ).sort();
+    const key = JSON.stringify(compositions);
+    const previousDate = seen.get(key);
+    if (previousDate) throw new DuplicateDayError(`Dni ${previousDate} i ${day.date} mają ten sam zestaw dań.`);
+    seen.set(key, day.date);
+  }
 }
 
 // Ingredients already represent individual meals on specific days. Never multiply by shopDays again.
@@ -179,6 +198,7 @@ Deno.serve(async (req) => {
   const date = (d: Date) => d.toISOString().slice(0, 10);
 
   const instructions = `Wygeneruj polski jadłospis na ${Number(settings.shopDays)} dni od ${date(start)} do ${date(end)}. Cel: ${settings.goal}; dziennie około ${kcal} kcal oraz ${protein} g białka; dokładnie ${settings.mealCount} posiłków dziennie.
+Różnorodność jest wymagana: zestaw dań każdego dnia musi różnić się od każdego innego dnia cyklu. Między dowolnymi dwoma dniami zmień przynajmniej jeden posiłek na danie z innym zestawem składników. Nie kopiuj całych dni. Sama zmiana nazwy, godziny, kolejności, ilości składników lub makroskładników nie jest zmianą dania. Pojedynczy posiłek może się powtórzyć, ale nie cały zestaw dnia. Zachowaj konkretne nazwy składników; nie przemianowuj tych samych produktów, aby udawać różnorodność. Przed zwróceniem JSON porównaj wszystkie dni i popraw ewentualne duplikaty.
 Składniki muszą być dostępne w Biedronce. Każdy składnik to obiekt {name,category,amount,unit,biedronka:true}. amount to liczba oznaczająca ilość DLA JEDNEGO POSIŁKU, nie całego cyklu. unit wyłącznie g, kg, ml, l lub szt. Wagi dotyczą części jadalnych (dla konserw po odsączeniu, dla ryżu i makaronu przed gotowaniem). Używaj zawsze tej samej konkretnej polskiej nazwy i jednostki dla danego składnika we wszystkich posiłkach. Bez alternatyw, ukośników, opcjonalnych składników, łyżek, porcji i opakowań; np. oliwa w ml, przyprawy w g, chleb w g. NIE twórz shopping_items: serwer sam zsumuje składniki wszystkich dni.
 Sprawdź aktualne promocje na https://zakupy.biedronka.pl/polecane/promocje/ i wykorzystaj pasujące produkty w posiłkach. promotions ma zawierać WYŁĄCZNIE oferty żywności użytej w jadłospisie. Każda oferta musi zawierać ingredient_name identyczne z name odpowiedniego składnika, product (pełna nazwa produktu sklepu), offer, verified:true, source_url (odwiedzony oficjalny URL), valid_from i valid_to (YYYY-MM-DD). Musi być ważna w dniu zakupów ${date(start)}. Bez potwierdzenia źródła i dat zwróć pustą tablicę, nie zgaduj. Nie dodawaj chemii, kosmetyków ani karmy.
 Podaj dla każdego posiłku szacunkowe kcal, protein_g, fat_g (tłuszcze) i carbs_g (węglowodany), liczby nieujemne, dla podanych ilości składników. Pole preparation ogranicz do jednego krótkiego zdania. Zwróć wyłącznie jeden obiekt JSON bez Markdown, cytowań ani tekstu poza JSON: {"days":[{"date":"YYYY-MM-DD","meals":[{"name":"...","time":"08:00","kcal":700,"protein_g":40,"fat_g":20,"carbs_g":90,"ingredients":[{"name":"Filet z piersi kurczaka","category":"Mięso i ryby","amount":220,"unit":"g","biedronka":true}],"preparation":"..."}]}],"promotions":[{"ingredient_name":"Filet z piersi kurczaka","product":"...","offer":"...","verified":true,"source_url":"https://zakupy.biedronka.pl/...","valid_from":"YYYY-MM-DD","valid_to":"YYYY-MM-DD"}]}.`;
@@ -217,6 +237,7 @@ Podaj dla każdego posiłku szacunkowe kcal, protein_g, fat_g (tłuszcze) i carb
     promotions = filterPromotions(generated.promotions, shoppingItems, response, date(start));
   } catch (error) {
     console.error("Invalid AI meal plan", error instanceof Error ? error.message : "Unknown validation error");
+    if (error instanceof DuplicateDayError) return Response.json({ error: "Generator AI powielił jadłospis. " + error.message + " Plan nie został zapisany. Spróbuj wygenerować ponownie." }, { status: 502, headers: corsHeaders });
     return Response.json({ error: "Generator zwrócił nieprawidłowy plan: " + (error instanceof Error && !(error instanceof SyntaxError) ? error.message : "Nie udało się odczytać JSON.") }, { status: 502, headers: corsHeaders });
   }
 

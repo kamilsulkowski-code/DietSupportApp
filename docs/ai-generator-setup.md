@@ -68,6 +68,27 @@ pole pomocnicze SDK `response.output_text`. Niekompletne odpowiedzi są odrzucan
 
 ## Weryfikacja
 
+### Różnorodność dni
+
+Instrukcja dla AI wymaga, aby między każdymi dwoma dniami cyklu zmienił się
+co najmniej jeden posiłek na danie z innym zestawem składników. Pojedyncze
+dania mogą się powtarzać; całe dni nie mogą być kopiowane.
+
+Walidator przed jakimkolwiek zapisem porównuje zestawy znormalizowanych nazw
+składników każdego posiłku i każdego dnia. Ignoruje tytuły, godziny, kolejność,
+wielkość porcji i makro, więc kosmetyczne zmiany nie ukrywają duplikatu.
+Sprawdza również dni niekolejne. Jest to porównanie składu, nie semantyczna
+ocena przepisów: synonimy nazw i drobna zmiana składnika mogą wyglądać na różnicę.
+
+Po wykryciu kopii klient otrzyma komunikat wskazujący daty powielonych dni
+i informację, że nowy plan nie został zapisany. Dotychczasowy plan pozostaje
+nienaruszony. Nie uruchamiamy automatycznego ponowienia płatnego zapytania;
+użytkownik może świadomie spróbować ponownie.
+
+Poprawka nie zmienia historycznych planów. Po jej wdrożeniu trzeba wygenerować
+nowy plan. Testy po rzeczywistym zalogowaniu pozostają odłożone zgodnie z
+wcześniejszą prośbą użytkownika.
+
 1. Zaloguj się do aplikacji i zapisz ustawienia.
 2. Kliknij **Wygeneruj plan**.
 3. Upewnij się, że w `meal_plans` i `shopping_cycles` powstały rekordy z tym
