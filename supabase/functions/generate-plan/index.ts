@@ -58,7 +58,11 @@ Deno.serve(async (req) => {
       text: { format: { type: "json_object" } },
     }),
   });
-  if (!aiResponse.ok) return Response.json({ error: "Generator AI nie odpowiedział." }, { status: 502, headers: corsHeaders });
+  if (!aiResponse.ok) {
+    const detail = await aiResponse.text();
+    console.error("OpenAI API error", aiResponse.status, detail);
+    return Response.json({ error: `Generator AI nie odpowiedział. Kod OpenAI: ${aiResponse.status}` }, { status: 502, headers: corsHeaders });
+  }
   const response = await aiResponse.json();
   let generated: Record<string, unknown>;
   try { generated = JSON.parse(response.output_text); } catch { return Response.json({ error: "Generator zwrócił nieprawidłowy plan." }, { status: 502, headers: corsHeaders }); }
