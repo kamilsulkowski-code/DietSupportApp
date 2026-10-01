@@ -14,62 +14,6 @@ type Settings = {
   shopDays: number;
 };
 
-const planSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["days", "shopping_items", "promotions", "promotion_source_url"],
-  properties: {
-    days: {
-      type: "array",
-      minItems: 2,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["date", "meals", "total_kcal", "total_protein_g"],
-        properties: {
-          date: { type: "string" },
-          total_kcal: { type: "integer" },
-          total_protein_g: { type: "integer" },
-          meals: {
-            type: "array",
-            minItems: 3,
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["name", "time", "kcal", "protein_g", "ingredients", "preparation"],
-              properties: {
-                name: { type: "string" }, time: { type: "string" }, kcal: { type: "integer" },
-                protein_g: { type: "integer" }, preparation: { type: "string" },
-                ingredients: { type: "array", items: { type: "string" } },
-              },
-            },
-          },
-        },
-      },
-    },
-    shopping_items: {
-      type: "array",
-      items: {
-        type: "object", additionalProperties: false,
-        required: ["category", "name", "amount", "unit", "biedronka"],
-        properties: {
-          category: { type: "string" }, name: { type: "string" }, amount: { type: "number" },
-          unit: { type: "string" }, biedronka: { type: "boolean" },
-        },
-      },
-    },
-    promotions: {
-      type: "array",
-      items: {
-        type: "object", additionalProperties: false,
-        required: ["product", "offer", "verified"],
-        properties: { product: { type: "string" }, offer: { type: "string" }, verified: { type: "boolean" } },
-      },
-    },
-    promotion_source_url: { type: "string" },
-  },
-};
-
 function targetKcal(settings: Settings) {
   if (settings.calories) return Number(settings.calories);
   const multiplier = settings.goal === "gain" ? 34 : settings.goal === "cut" ? 28 : 31;
@@ -102,7 +46,7 @@ Deno.serve(async (req) => {
   const end = new Date(start); end.setUTCDate(start.getUTCDate() + Number(settings.shopDays) - 1);
   const date = (d: Date) => d.toISOString().slice(0, 10);
 
-  const instructions = `Jesteś polskim dietetykiem i planistą zakupów. Wygeneruj plan na ${Number(settings.shopDays)} dni od ${date(start)} do ${date(end)}. Cel: ${settings.goal}; dziennie dokładnie około ${kcal} kcal oraz ${protein} g białka; ${settings.mealCount} posiłków dziennie. Składniki muszą być dostępne w Biedronce. Najpierw użyj narzędzia wyszukiwania, aby sprawdzić aktualne promocje wyłącznie na https://zakupy.biedronka.pl/polecane/promocje/ . Używaj tylko ofert, które udało się zweryfikować w tym źródle; gdy nie udało się znaleźć promocji, zwróć pustą tablicę promotions i pusty URL. Ilości zakupowe policz dla całego cyklu. Zwróć wyłącznie dane zgodne ze schematem.`;
+  const instructions = `Jesteś polskim dietetykiem i planistą zakupów. Wygeneruj plan na ${Number(settings.shopDays)} dni od ${date(start)} do ${date(end)}. Cel: ${settings.goal}; dziennie dokładnie około ${kcal} kcal oraz ${protein} g białka; ${settings.mealCount} posiłków dziennie. Składniki muszą być dostępne w Biedronce. Najpierw użyj narzędzia wyszukiwania, aby sprawdzić aktualne promocje wyłącznie na https://zakupy.biedronka.pl/polecane/promocje/ . Używaj tylko ofert, które udało się zweryfikować w tym źródle; gdy nie udało się znaleźć promocji, zwróć pustą tablicę promotions i pusty URL. Ilości zakupowe policz dla całego cyklu. Zwróć wyłącznie JSON o strukturze {days:[{date,total_kcal,total_protein_g,meals:[{name,time,kcal,protein_g,ingredients,preparation}]}],shopping_items:[{category,name,amount,unit,biedronka}],promotions:[{product,offer,verified}],promotion_source_url:string}.`;
   const aiResponse = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${openAiKey}`, "Content-Type": "application/json" },
@@ -110,14 +54,15 @@ Deno.serve(async (req) => {
       model: "gpt-5-mini",
       store: false,
       tools: [{ type: "web_search" }],
-      input: [{ role: "system", content: instructions }],
-      text: { format: { type: "json_schema", name: "forma_meal_plan", strict: true, schema: planSchema } },
+      input: instructions,
+      text: { format: { type: "json_object" } },
     }),
   });
-  if (!aiResponse.ok) return Response.json({ error: "Generator AI nie odpowiedział.", detail: await aiResponse.text() }, { status: 502, headers: corsHeaders });
+  if (!aiResponse.ok) return Response.json({ error: "Generator AI nie odpowiedział." }, { status: 502, headers: corsHeaders });
   const response = await aiResponse.json();
   let generated: Record<string, unknown>;
   try { generated = JSON.parse(response.output_text); } catch { return Response.json({ error: "Generator zwrócił nieprawidłowy plan." }, { status: 502, headers: corsHeaders }); }
+  if (!Array.isArray(generated.days) || !Array.isArray(generated.shopping_items) || !Array.isArray(generated.promotions)) return Response.json({ error: "Generator zwrócił niepełny plan." }, { status: 502, headers: corsHeaders });
 
   const { data: plan, error: planError } = await admin.from("meal_plans").insert({
     user_id: user.id, cycle_start: date(start), cycle_end: date(end), target_kcal: kcal,
