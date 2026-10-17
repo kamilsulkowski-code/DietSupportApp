@@ -68,6 +68,13 @@ pole pomocnicze SDK `response.output_text`. Niekompletne odpowiedzi są odrzucan
 
 ## Weryfikacja
 
+### Treningi a kalorie
+
+Zadanie #5 dodaje `profiles.settings.trainingsPerWeek`. UI i funkcja Edge
+uwzględniają treningi w automatycznej kaloryczności, zachowując pierwszeństwo
+ręcznego celu. Opis uproszczeń, wzoru, zgodności starych profili i wdrożenia:
+[Treningi tygodniowo](training-settings.md).
+
 ### Różnorodność dni
 
 Instrukcja dla AI wymaga, aby między każdymi dwoma dniami cyklu zmienił się

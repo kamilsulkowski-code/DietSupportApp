@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { task3Fixture } from './fixtures/task3.mjs';
 
 const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8');
-const names = ['goalName', 'targetKcal', 'targetProtein', 'scaleAmount', 'scaleIngredient', 'buildPlan', 'formatIngredient', 'todayDate', 'selectedDayIndex', 'escapeHtml', 'mealIcon', 'mealImage', 'macroNumber', 'macroText', 'localPlanFromRemote', 'currentPlan', 'renderDay', 'renderDashboard'];
+const names = ['goalName', 'trainingCount', 'calorieTarget', 'targetKcal', 'targetProtein', 'scaleAmount', 'scaleIngredient', 'buildPlan', 'formatIngredient', 'todayDate', 'selectedDayIndex', 'escapeHtml', 'mealIcon', 'mealImage', 'macroNumber', 'macroText', 'localPlanFromRemote', 'currentPlan', 'renderDay', 'renderDashboard'];
 const functions = html.split('\n').filter(line => names.some(name => line.startsWith(`function ${name}(`))).join('\n');
 const demoMeals = html.slice(html.indexOf('const meals=['),html.indexOf('const defaultSettings='));
 const planShares = html.split('\n').find(line => line.startsWith('const planShares='));
