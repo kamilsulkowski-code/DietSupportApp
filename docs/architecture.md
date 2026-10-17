@@ -34,7 +34,10 @@ GitHub Actions
 
 ## Generator AI
 
-- Kalkulator oblicza cel kalorii i białka na podstawie ustawień użytkownika.
+- Kalkulator oblicza cel kalorii z wagi, celu i średniej liczby treningów
+  tygodniowo; ręczny cel ma pierwszeństwo. Białko wynika z wagi i g/kg.
+  Te same obliczenia wykonuje Edge; testy sprawdzają zgodność obu implementacji.
+  Pole treningów jest częścią JSONB `profiles.settings`, bez nowej tabeli.
 - Funkcja `generate-plan` przekazuje te cele do API OpenAI, wymusza odpowiedź w schemacie JSON i zapisuje wynik po zweryfikowaniu sesji użytkownika.
 - Generator sprawdza oficjalną stronę promocji Biedronki i zapisuje snapshot wyłącznie zweryfikowanych ofert wraz z cyklem zakupowym.
 - Szczegóły wdrożenia są w `docs/ai-generator-setup.md`.
@@ -45,6 +48,8 @@ Brak zależności budowanych lokalnie. Strona korzysta z fontów Google Fonts w 
 
 ## Sekrety
 
-`OPENAI_API_KEY` istnieje wyłącznie jako zaszyfrowany sekret GitHub Actions. Służy tylko do ręcznie uruchamianego workflow AI review i nie może trafić do kodu ani do `dist/index.html`.
+Generator używa `OPENAI_API_KEY` z sekretów funkcji Supabase. Opcjonalny AI review
+używa osobnego sekretu o tej samej nazwie w GitHub Actions. Żaden z nich nie może
+trafić do kodu klienta, repozytorium ani GitHub Pages.
 
 Supabase `publishable/anon` key jest używany przez klienta przeglądarkowego. Klucz `service_role` jest administracyjny i nie może trafić do repozytorium, GitHub Pages ani konfiguracji `dist/supabase-config.js`.

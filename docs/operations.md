@@ -3,15 +3,36 @@
 ## Publikacja
 
 1. Zmiana trafia do Pull Requesta.
-2. Workflow „Kontrola jakości” uruchamia `python3 scripts/validate_site.py`.
+2. Workflow „Kontrola jakości” uruchamia walidację strony oraz testy generatora,
+   formularza logowania, jadłospisu dnia i ustawień treningów (Node.js 24).
 3. Po scaleniu do `main` workflow „Publikacja na GitHub Pages” publikuje katalog `dist`.
 4. Adres produkcyjny: `https://kamilsulkowski-code.github.io/DietSupportApp/`.
+
+## Wydanie 1.0.1 i śledzenie wymagań
+
+- Wymaganie #5 → PR #6 → finalny commit/tag `v1.0.1` → Release i milestone `1.0.1`.
+- Mapowanie każdego kryterium na kod i testy: [opis wydania](releases/v1.0.1.md).
+- `VERSION` jest wersją repozytorium; frontend publikuje `dist/version.json`.
+  Sprawdzaj na produkcji `/DietSupportApp/version.json`, nie tylko etykietę Release.
+- Edge nie wdraża się przez workflow Pages. Najpierw wdrażamy `generate-plan`
+  z zatwierdzonego PR do projektu DietApp i po przeładowaniu porównujemy kod.
+  Następnie scalamy PR i sprawdzamy osobno CI oraz zakończenie publikacji Pages.
+- Brak migracji SQL w 1.0.1. Nie zmieniamy danych użytkowników ani sekretów.
+- Tag obejmuje pliki, nie konfigurację Auth, sekretów i danych Supabase.
+  Potwierdzenia wdrożenia oraz odnośniki do przebiegów są zapisywane w Release
+  i komentarzu zadania #5. Pełny test zalogowanej sesji nie jest tym samym,
+  co sprawdzenie wdrożonego kodu; odłożonego testu nie oznaczamy jako zaliczony.
 
 ## Wycofanie zmiany
 
 1. Znajdź ostatni prawidłowy commit na `main`.
 2. Utwórz Pull Request odwracający nieprawidłową zmianę.
 3. Po jego scaleniu automatyczne wdrożenie opublikuje poprzednią wersję.
+4. Przy cofnięciu całej wersji wdróż również
+   `supabase/functions/generate-plan/index.ts` z docelowego tagu do Supabase.
+   Cofnięcie samego frontendu nie cofa Edge, schematu ani danych.
+5. Zweryfikuj CI/Pages, zgodność kodu Edge i działanie interfejsu. Zachowaj
+   historię przez nowy commit/PR; nie używaj force-push ani nie przesuwaj tagów.
 
 ## Reakcja na błąd CI
 

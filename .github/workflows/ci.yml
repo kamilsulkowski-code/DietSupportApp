@@ -24,3 +24,5 @@ jobs:
         run: node --test scripts/auth_otp.test.mjs
       - name: Sprawdź kryteria jadłospisu dnia
         run: node --test scripts/task3_acceptance.test.mjs
+      - name: Sprawdź treningi, zapis ustawień i zgodność kalorii UI/Edge
+        run: node --test scripts/training_settings.test.mjs

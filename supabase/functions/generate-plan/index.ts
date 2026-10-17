@@ -8,6 +8,7 @@ const corsHeaders = {
 type Settings = {
   goal: "cut" | "gain" | "keep";
   weight: number;
+  trainingsPerWeek?: number | string | null;
   calories?: number | string;
   protein: number;
   mealCount: number;
@@ -164,10 +165,21 @@ function filterPromotions(value: unknown, items: Ingredient[], response: AiRespo
   return [...kept.values()];
 }
 
+// Keep aligned with the frontend; parity tests cover every goal.
+// Assumed 60-minute, 3.5-MET session: 2.5 kcal/kg above resting energy.
+function trainingCount(value: unknown) {
+  if (value === undefined || value === null) return 0;
+  if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) throw new Error("Podaj liczbę treningów od 0 do 14, co 0,5.");
+  const count = Number(value);
+  if (!Number.isFinite(count) || count < 0 || count > 14 || !Number.isInteger(count * 2)) throw new Error("Podaj liczbę treningów od 0 do 14, co 0,5.");
+  return count;
+}
+
 function targetKcal(settings: Settings) {
+  const trainings = trainingCount(settings.trainingsPerWeek);
   if (settings.calories) return Number(settings.calories);
   const multiplier = settings.goal === "gain" ? 34 : settings.goal === "cut" ? 28 : 31;
-  return Math.max(1200, Math.round(Number(settings.weight) * multiplier));
+  return Math.max(1500, Math.round(Number(settings.weight) * (multiplier + 2.5 * trainings / 7)));
 }
 
 Deno.serve(async (req) => {
@@ -191,7 +203,9 @@ Deno.serve(async (req) => {
   if (profileError || !profile?.settings) return Response.json({ error: "Najpierw zapisz założenia planu." }, { status: 400, headers: corsHeaders });
   const settings = profile.settings as Settings;
   if (!Number.isInteger(Number(settings.shopDays)) || Number(settings.shopDays) < 1 || Number(settings.shopDays) > 14 || !Number.isInteger(Number(settings.mealCount)) || Number(settings.mealCount) < 1 || Number(settings.mealCount) > 6) return Response.json({ error: "Nieprawidłowa liczba dni lub posiłków." }, { status: 400, headers: corsHeaders });
-  const kcal = targetKcal(settings);
+  let kcal: number;
+  try { kcal = targetKcal(settings); }
+  catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Nieprawidłowe ustawienia treningów." }, { status: 400, headers: corsHeaders }); }
   const protein = Math.round(Number(settings.weight) * Number(settings.protein));
   const start = new Date(); start.setUTCHours(0, 0, 0, 0);
   const end = new Date(start); end.setUTCDate(start.getUTCDate() + Number(settings.shopDays) - 1);

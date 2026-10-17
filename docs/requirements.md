@@ -1,42 +1,48 @@
-# Wymagania produktu
+# Wymagania produktu — 1.0.1
 
-## Cel
+## Źródło wymagań
 
-Forma pomaga użytkownikowi ułożyć prosty, przykładowy jadłospis dopasowany do celu treningowego, masy ciała i częstotliwości treningów.
+Źródłem są [zadania GitHub](https://github.com/kamilsulkowski-code/DietSupportApp/issues).
+MVP `v1.0.0` obejmuje zaakceptowane #1–#4; wydanie `v1.0.1` dodaje #5.
+Historia: [CHANGELOG](../CHANGELOG.md).
 
-## Użytkownik
+## Zakres
 
-Osoba trenująca rekreacyjnie, która chce szybko poznać orientacyjny cel kaloryczny, ilość białka oraz listę podstawowych zakupów.
+- #1: lista produktów i ilości na cykl zakupowy, pozycje w koszyku,
+  oznaczanie zakupów jako zrealizowanych i daty cyklu.
+- #2: cel diety, waga, wzrost, opcjonalne kalorie, białko w g/kg, liczba
+  posiłków i częstotliwość zakupów.
+- #3: jadłospis wybranego dnia, makro, ilustracje kategorii, mierzalne
+  składniki i krótkie instrukcje przygotowania.
+- #4: wielodniowy generator AI, zakupy wyliczone ze składników, filtrowane
+  promocje Biedronki powiązane z posiłkami i zapis wyników w Supabase.
+- #5: wybór, zapis i wpływ średniej liczby treningów tygodniowo na kalorie.
+- Responsywny interfejs; lokalne dane bez logowania i synchronizacja własnych
+  ustawień i zakupów po zalogowaniu. Generowanie AI wymaga zalogowania.
 
-## Zakres obecnej wersji
+## Kryteria akceptacji zadania #5
 
-- wybór celu: redukcja, budowa mięśni lub utrzymanie wagi;
-- podanie wieku, wzrostu, wagi i liczby treningów tygodniowo;
-- wpisanie preferencji i produktów do pominięcia;
-- wyliczenie orientacyjnej liczby kalorii oraz białka;
-- przykładowy plan czterech posiłków;
-- lista zakupów na trzy dni;
-- działanie na telefonie i komputerze, bez logowania.
+1. **#5.1** — użytkownik wybiera średnią liczbę treningów w ustawieniach.
+2. **#5.2** — aplikacja zapisuje wybraną liczbę.
+3. **#5.3** — liczba treningów wpływa na automatyczną kalkulację kalorii.
 
-## Kryteria akceptacji
+Interpretacja: 0–14 co 0,5; starszy profil = 0; ręczne kalorie mają pierwszeństwo.
+Jest to rozszerzenie heurystyki MVP, nie indywidualny pomiar TDEE.
+Białko nie zmienia się od samej liczby treningów.
+[Wzór i ograniczenia](training-settings.md).
+[Mapowanie kryteriów na kod i nazwane testy](releases/v1.0.1.md).
 
-1. Formularz działa na ekranie telefonu i desktopie bez poziomego przewijania.
-2. Zmiana celu, masy lub treningów aktualizuje kalorie i białko po wybraniu „Ułóż mój plan”.
-3. Wpisanie „bez laktozy” zmienia pozycję nabiału na roślinną alternatywę.
-4. Wpisanie informacji o unikaniu ryb nie pokazuje ryb na liście zakupów.
-5. Strona wyświetla informację, że plan ma charakter orientacyjny.
+## Ograniczenia i poza zakresem
 
-## Poza zakresem
-
-- diagnozowanie stanu zdrowia lub tworzenie zaleceń medycznych;
-- płatności, konta użytkowników i trwały zapis danych;
-- liczenie makroskładników dla każdego produktu;
-- integracja z urządzeniami treningowymi.
-
-## Kierunek rozwoju
-
-- zapisywanie profilu i planów;
-- edycja posiłków oraz składników;
-- tygodniowy plan i lista zakupów z ilościami;
-- eksport listy zakupów;
-- bardziej precyzyjne wyliczenia z uwzględnieniem płci i aktywności dziennej.
+- Brak diagnozowania i zaleceń medycznych; plan i makro są orientacyjne.
+- Wiek, płeć, aktywność pozatreningowa i rzeczywisty czas/intensywność sesji
+  nie uczestniczą w obliczeniu kalorii. Wzrost jest zapisywany, ale nie używany.
+- Nie ma obecnie formularza alergii, preferencji ani wykluczeń; nie deklarujemy
+  automatycznego dopasowania do alergii lub nietolerancji.
+- Brak kontroli dopuszczalnego odchylenia wyniku AI od celu kalorii i białka.
+- Produkcyjne logowanie używa linków e-mail. Przygotowany wariant kodu OTP
+  wymaga osobnej konfiguracji; testy nie oznaczają jego aktywacji.
+- Zmiana założeń nie przepisuje istniejących jadłospisów; trzeba wygenerować nowe.
+- Brak płatności, integracji z urządzeniami treningowymi i edycji receptur.
+- Pełny test po rzeczywistym zalogowaniu i płatnym generowaniu jest odłożony
+  na osobną sesję zgodnie z decyzją użytkownika, a nie zaliczony.
