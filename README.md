@@ -1,6 +1,24 @@
 # Forma — plan żywieniowy
 
-Aplikacja do ułożenia przykładowego jadłospisu z obliczeniem kalorii, białka i listą zakupów.
+Responsywna aplikacja do planowania jadłospisu AI, kalorii, białka i zakupów.
+Frontend działa na GitHub Pages, a logowanie, dane i generator — w Supabase.
+
+## Wersja 1.0.1
+
+- [Wydanie v1.0.1](https://github.com/kamilsulkowski-code/DietSupportApp/releases/tag/v1.0.1)
+  rozszerza MVP v1.0.0 o średnią liczbę treningów tygodniowo.
+- Wymagania: [zadanie #5](https://github.com/kamilsulkowski-code/DietSupportApp/issues/5).
+  Implementacja i przegląd: [PR #6](https://github.com/kamilsulkowski-code/DietSupportApp/pull/6).
+- [Mapowanie kryteriów na kod i testy](docs/releases/v1.0.1.md),
+  [wzór i ograniczenia kalkulatora](docs/training-settings.md),
+  [wdrożenie i cofnięcie wersji](docs/operations.md).
+- Informacja o wersji frontendu: `dist/version.json`, publikowana pod
+  `/DietSupportApp/version.json`. Tag wydania wskazuje dokładny commit;
+  backend wymaga oddzielnego wdrożenia źródła z tego samego tagu.
+
+Ręcznie podane kalorie mają pierwszeństwo przed oszacowaniem z treningów.
+Plany i wartości odżywcze są orientacyjne. Zmiana założeń nie przepisuje
+historycznych jadłospisów — trzeba wygenerować nowy plan.
 
 ## CI/CD
 
