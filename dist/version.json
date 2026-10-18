@@ -4,5 +4,12 @@
   "requirement": "https://github.com/kamilsulkowski-code/DietSupportApp/issues/5",
   "pullRequest": "https://github.com/kamilsulkowski-code/DietSupportApp/pull/6",
   "implementationCommit": "707312654a521cf61bf7acc8d9667d4d547b87e3",
-  "backendSource": "supabase/functions/generate-plan/index.ts"
+  "backendSource": "supabase/functions/generate-plan/index.ts",
+  "frontendUpdate": {
+    "id": "ux-7",
+    "requirement": "https://github.com/kamilsulkowski-code/DietSupportApp/issues/7",
+    "pullRequest": "https://github.com/kamilsulkowski-code/DietSupportApp/pull/8",
+    "documentation": "docs/ux-improvements.md",
+    "releaseBaseline": "v1.0.1"
+  }
 }

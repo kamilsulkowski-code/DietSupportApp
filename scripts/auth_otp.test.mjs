@@ -13,7 +13,7 @@ function harness({send,verify}={}){
   signInWithOtp:async args=>{calls.push(['send',args]);return send?send(args):{error:null}},
   verifyOtp:async args=>{calls.push(['verify',args]);return verify?verify(args):{data:{session:{user:{email:args.email}}},error:null}}
  }}});
- vm.runInContext('const loginCodeEnabled=true;let authBusy=false,loginStep="email",loginPendingEmail="",loginCooldownTimer=null,currentUser=null;const loginResendAfter=new Map();\n'+source,context);
+ vm.runInContext('const loginCodeEnabled=true;let authBusy=false,generatingPlan=false,lastLoginFocus=null,loginStep="email",loginPendingEmail="",loginCooldownTimer=null,currentUser=null;const loginResendAfter=new Map();\n'+source,context);
  return {$,calls,messages,run:code=>vm.runInContext(code,context)};
 }
 

@@ -13,7 +13,7 @@ const dayChange = html.split('\n').find(line => line.startsWith('$("#planDaySele
 
 // Lightweight select semantics; browser tests independently verify these scenarios.
 class Element {
-  textContent = ''; disabled = false; value = ''; listeners = {}; markup = '';
+  textContent = ''; disabled = false; value = ''; listeners = {}; markup = ''; style = {}; attributes = {};
   set innerHTML(value) {
     this.markup = value;
     if (value.startsWith('<option')) {
@@ -24,6 +24,7 @@ class Element {
   }
   get innerHTML() { return this.markup; }
   addEventListener(name, listener) { this.listeners[name] = listener; }
+  setAttribute(name,value) { this.attributes[name]=String(value); }
 }
 
 function harness(scenario = 'normal') {
@@ -34,7 +35,7 @@ function harness(scenario = 'normal') {
     constructor(...args) { super(...(args.length ? args : ['2026-10-01T12:00:00Z'])); }
     static now() { return Date.parse('2026-10-01T12:00:00Z'); }
   }
-  const context = vm.createContext({ Date:TestDate,
+  const context = vm.createContext({ Date:TestDate, currentUser:null, renderAccount(){}, navigate(){},
     remotePlan:fixture.plan,
     state:{goal:'keep', weight:70, protein:2, calories:2200, mealCount:4, shopDays:3, selectedPlanDay:fixture.selectedIndex},
     $: selector => elements[selector] ??= new Element(),

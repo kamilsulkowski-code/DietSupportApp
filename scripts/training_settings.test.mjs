@@ -10,10 +10,10 @@ const lines=html.split('\n');
 function frontend({stored=null,cloud=null,syncError=false,loggedIn=false}={}) {
  const elements=new Map(),storage=new Map(),messages=[],writes=[],invocations=[];
  if(stored)storage.set('forma-settings',JSON.stringify(stored));
- const $=selector=>{if(!elements.has(selector))elements.set(selector,{value:'',textContent:'',listeners:{},addEventListener(event,fn){this.listeners[event]=fn}});return elements.get(selector)};
+ const $=selector=>{if(!elements.has(selector))elements.set(selector,{value:'',textContent:'',listeners:{},classList:{add(){},remove(){}},setAttribute(){},addEventListener(event,fn){this.listeners[event]=fn}});return elements.get(selector)};
  const context=vm.createContext({$, $$:()=>[],Date,console,
   localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value)},
-  currentUser:loggedIn?{id:'owner'}:null,remotePlan:null,checks:{},generatingPlan:false,
+  currentUser:loggedIn?{id:'owner'}:null,remotePlan:null,remoteShopping:null,checks:{},generatingPlan:false,settingsDirty:false,draftGoal:null,undoShopping:null,
   db:{
    from:table=>({
     upsert:async row=>{writes.push({table,row:JSON.parse(JSON.stringify(row))});return{error:syncError?new Error('network'):null}},
@@ -21,9 +21,9 @@ function frontend({stored=null,cloud=null,syncError=false,loggedIn=false}={}) {
    }),
    functions:{invoke:async()=>{invocations.push(1);return{data:{plan:null},error:null}}},
   },
-  toast:message=>messages.push(message),render(){},restoreRemotePlan:async()=>{},
+  toast:message=>messages.push(message),render(){},renderAccount(){},applyRoute(){},restoreRemotePlan:async()=>{},
  });
- const names=['trainingCount','calorieTarget','targetKcal','updateCalorieEstimate','renderSettings'];
+ const names=['goalName','trainingCount','calorieTarget','targetKcal','updateCalorieEstimate','renderSettings','readSettingsForm','markSettingsDirty','updateCalorieMode','settingsSignature'];
  const source=lines.filter(line=>line.startsWith('const defaultSettings=')||line.startsWith('let state=')||names.some(name=>line.startsWith('function '+name+'('))||['syncToCloud','restoreFromCloud','generatePlan'].some(name=>line.startsWith('async function '+name+'('))||line.startsWith('$("#settingsForm").addEventListener')).join('\n');
  vm.runInContext(source,context);vm.runInContext('renderSettings()',context);
  return{$,storage,messages,writes,invocations,context,run:code=>vm.runInContext(code,context),save:()=>$('#settingsForm').listeners.submit({preventDefault(){}})};
@@ -99,17 +99,17 @@ test('K2: zapis i ponowny odczyt z profiles.settings synchronizują treningi',as
 test('podgląd reaguje na zmianę treningów przed zapisaniem, ręczny cel jest jawny',()=>{
  const h=frontend();h.$('#trainingsPerWeek').value='7';h.$('#settingsForm').listeners.input();
  assert.match(h.$('#calorieEstimate').textContent,/2.?318 kcal/);assert.equal(h.run('state.trainingsPerWeek'),0);
- h.$('#calories').value='2000';h.$('#settingsForm').listeners.input();assert.match(h.$('#calorieEstimate').textContent,/Ręczny cel.*2.?000 kcal/);
+ h.$('#calorieMode').value='manual';h.$('#calories').value='2000';h.$('#settingsForm').listeners.input();assert.match(h.$('#calorieEstimate').textContent,/Ręczny cel.*2.?000 kcal/);
 });
 test('błędny formularz nie zmienia zapisanych danych',async()=>{
  const h=frontend({loggedIn:true});h.$('#trainingsPerWeek').value='-1';await h.save();
- assert.equal(h.writes.length,0);assert.equal(h.storage.has('forma-settings'),false);assert.match(h.messages[0],/liczbę treningów/);
+ assert.equal(h.writes.length,0);assert.equal(h.storage.has('forma-settings'),false);assert.match(h.$('#saveStatus').textContent,/liczbę treningów/);
 });
 test('nieudana synchronizacja nie udaje sukcesu i blokuje generator ze starymi ustawieniami',async()=>{
  const h=frontend({loggedIn:true,syncError:true});h.$('#trainingsPerWeek').value='5';await h.save();
  assert.equal(JSON.parse(h.storage.get('forma-settings')).trainingsPerWeek,5);
  assert.match(h.$('#saveStatus').textContent,/Synchronizacja nie powiodła/);
- await h.run('generatePlan()');assert.equal(h.invocations.length,0);assert.match(h.messages.at(-1),/Nie zapisano aktualnych założeń/);
+ await h.run('generatePlan()');assert.equal(h.invocations.length,0);assert.match(h.$('#generationStatus').textContent,/Nie zapisano aktualnych założeń/);
 });
 test('Edge: cel zależy od zapisanych treningów i trafia do AI oraz meal_plans',async()=>{
  for(const [trainingsPerWeek,calories,target]of [[0,'',2170],[7,'',2345],[3.5,'',2258],[7,2000,2000]]){
