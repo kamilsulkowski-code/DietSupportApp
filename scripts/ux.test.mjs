@@ -67,7 +67,7 @@ function domHarness(){
  return document;
 }
 
-function harness({loggedIn=false,plan=null,shopping=null,stored=null,invokeError=null,invokePlan=null,hash=''}={}){
+function harness({loggedIn=false,plan=null,shopping=null,stored=null,profile=null,invokeError=null,invokePlan=null,hash=''}={}){
  const document=domHarness(),storage=new Map(),calls={invoke:0,writes:[],history:[],scroll:[]},windowListeners={};
  if(stored)storage.set('forma-settings',JSON.stringify(stored));
  const location={origin:'https://test.invalid',pathname:'/DietSupportApp/',hash,search:''};
@@ -75,7 +75,7 @@ function harness({loggedIn=false,plan=null,shopping=null,stored=null,invokeError
  const history={pushState:(_data,_title,url)=>{calls.history.push(['push',url]);changeLocation(url)},replaceState:(_data,_title,url)=>{calls.history.push(['replace',url]);changeLocation(url)}};
  let responsePlan=plan;
  const chain={select(){return this},eq(){return this},gte(){return this},order(){return this},limit(){return this},async maybeSingle(){return{data:responsePlan,error:null}}};
- const client={from:table=>table==='profiles'?{upsert:async row=>{calls.writes.push(row);return{error:null}}}:table==='shopping_cycles'?{...chain,async maybeSingle(){return{data:shopping,error:null}}}:chain,
+ const client={from:table=>table==='profiles'?{...chain,async maybeSingle(){return{data:profile,error:null}},upsert:async row=>{calls.writes.push(row);return{error:null}}}:table==='shopping_cycles'?{...chain,async maybeSingle(){return{data:shopping,error:null}}}:chain,
   functions:{invoke:async()=>{calls.invoke++;if(invokeError)return{data:null,error:invokeError};responsePlan=invokePlan;return{data:{plan:invokePlan},error:null}}},auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange(listener){calls.authListener=listener},signOut:async()=>({error:null})}};
  const window={FORMA_SUPABASE:{url:'https://fake.invalid',anonKey:'isolated-test-only'},supabase:{createClient:()=>client},location,history,scrollTo:value=>calls.scroll.push(value),addEventListener:(type,fn)=>(windowListeners[type]??=[]).push(fn)};
  const context=vm.createContext({document,window,location,history,URL,URLSearchParams,Date,Map,Set,console,CSS:{escape:String},localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},requestAnimationFrame:fn=>fn()});
@@ -86,7 +86,7 @@ function harness({loggedIn=false,plan=null,shopping=null,stored=null,invokeError
  const run=code=>vm.runInContext(code,context);
  context.fixturePlan=plan;context.fixtureShopping=shopping;
  run(`currentUser=${loggedIn?'{id:"ux-test-owner",email:"ux@example.invalid"}':'null'};remotePlan=fixturePlan;remoteShopping=fixtureShopping;${plan||invokePlan?'state={...state,goal:"keep",weight:70,protein:2,calories:2200,mealCount:2,shopDays:3};':''}`);
- return{document,$:selector=>document.querySelector(selector),storage,calls,context,windowListeners,location,run};
+ return{document,$:selector=>document.querySelector(selector),storage,calls,context,windowListeners,location,run,setResponsePlan:plan=>{responsePlan=plan}};
 }
 
 function planFixture(){const fixture=task3Fixture().plan;const start=new Date();start.setHours(12,0,0,0);fixture.content.days.forEach((day,index)=>{const date=new Date(start);date.setDate(date.getDate()+index);day.date=date.toISOString().slice(0,10)});fixture.cycle_start=fixture.content.days[0].date;fixture.cycle_end=fixture.content.days.at(-1).date;fixture.created_at=new Date().toISOString();return fixture}
@@ -167,8 +167,11 @@ test('UX4: trasa z datą wskazuje te same dania po odtworzeniu widoku',()=>{
 test('UX4: przycisk Dzisiaj wraca z innego dnia do dzisiejszych posiłków i aktualizuje trasę',async()=>{
  const plan=planFixture(),h=harness({plan});h.run('state.selectedPlanDay=2;render();navigate("day")');
  assert.equal(h.run('currentPlan().date'),plan.content.days[2].date);assert.equal(h.$('#todayDay').disabled,false);
- await h.$('#todayDay').click();assert.equal(h.run('currentPlan().date'),plan.content.days[0].date);
+ h.$('#todayDay').focus();await h.$('#todayDay').click();assert.equal(h.run('currentPlan().date'),plan.content.days[0].date);
+ assert.equal(h.document.activeElement,h.$('#todayDay'));
  assert.equal(h.$('#planDaySelect').value,'0');assert.match(h.location.hash,new RegExp(plan.content.days[0].date));
+ h.$('#planDaySelect').focus();h.$('#planDaySelect').value='1';await h.$('#planDaySelect').emit('change');
+ assert.equal(h.document.activeElement,h.$('#planDaySelect'));assert.equal(h.run('currentPlan().date'),plan.content.days[1].date);
 });
 
 test('UX5: gość widzi neutralne powitanie, plan demonstracyjny i logowanie przed generowaniem',()=>{
@@ -234,6 +237,33 @@ test('UX7: oznaczenie wszystkich zakupów można cofnąć do dokładnego poprzed
  const h=harness({plan:planFixture(),shopping});h.run('checks={"Skyr":true};renderShopping()');
  await h.$('#completeShop').click();assert.equal(h.run('checks["Ryż biały"]'),true);assert.equal(h.$('#undoShop').hidden,false);
  await h.$('#undoShop').click();assert.equal(h.run('!!checks["Ryż biały"]'),false);assert.equal(h.run('checks.Skyr'),true);
+ await h.$('#completeShop').click();const checkbox=h.$('#categories input');checkbox.checked=false;await checkbox.emit('change');
+ assert.equal(h.run('undoShopping'),null);assert.equal(h.$('#undoShop').hidden,true);
+});
+
+test('UX7: wylogowanie unieważnia cofnięcie zakupów bez zmiany danych zapisanych w chmurze',async()=>{
+ for(const external of [false,true]){
+  const shopping={items:[{category:'Nabiał',name:'Skyr',amount:200,unit:'g'}],promotions:[]};
+  const h=harness({loggedIn:true,plan:planFixture(),shopping});h.run('state.mealCount=4;checks={"Skyr":false};render()');
+  await h.$('#completeShop').click();assert.ok(h.run('undoShopping'));
+  if(external){await h.run('initAuth()');h.run('currentUser={id:"ux-test-owner"}')}
+  const writes=h.calls.writes.length;
+  if(external)h.calls.authListener('SIGNED_OUT',null);else await h.$('#accountButton').click();
+  assert.equal(h.run('undoShopping'),null);assert.equal(h.run('Object.keys(checks).length'),0);
+  assert.equal(h.$('#undoShop').hidden,true);assert.equal(h.calls.writes.length,writes);
+  await h.$('#undoShop').click();assert.equal(h.calls.writes.length,writes);
+ }
+});
+
+test('UX7: odczyt innego profilu i zmiana cyklu nie pozwalają cofnąć poprzednich zakupów',async()=>{
+ const plan=planFixture(),shopping={items:[{category:'Nabiał',name:'Skyr',amount:200,unit:'g'}],promotions:[]};
+ const profile={settings:{goal:'keep',weight:70,protein:2,calories:2200,mealCount:4,shopDays:3},shopping_state:{'Nowy profil':true}};
+ const h=harness({loggedIn:true,plan,shopping,profile});h.run('undoShopping={"Stary profil":true}');
+ await h.run('restoreFromCloud()');assert.equal(h.run('undoShopping'),null);
+ assert.equal(h.run('checks["Nowy profil"]'),true);assert.equal(h.run('checks["Stary profil"]'),undefined);
+ const nextPlan={...plan,id:'new-shopping-cycle'};h.setResponsePlan(nextPlan);h.run('undoShopping={"Poprzedni cykl":true}');
+ await h.run('restoreRemotePlan()');h.run('renderShopping()');assert.equal(h.run('remotePlan.id'),nextPlan.id);
+ assert.equal(h.run('undoShopping'),null);assert.equal(h.$('#undoShop').hidden,true);
 });
 
 test('UX8: modal logowania blokuje tło, obsługuje Tab/Escape i oddaje fokus',async()=>{

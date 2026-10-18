@@ -31,10 +31,10 @@ Manifest `dist/version.json` rozróżnia aktualizację przez
 `frontendUpdate.id: "ux-7"` i bazę `releaseBaseline: "v1.0.1"`.
 Nie wymagają migracji SQL ani zmiany funkcji Edge. Testy izolowane nie
 zastępują testu z rzeczywistym logowaniem i płatnym AI ani badania użyteczności.
-Weryfikacja przed wdrożeniem: 77/77 testów (21 UX i 56 regresji), kontrola
+Weryfikacja przed wdrożeniem: 79/79 testów (23 UX i 56 regresji), kontrola
 struktury strony oraz przegląd szerokości 320/390/768/1440 px zakończone
 powodzeniem. [Raport i ograniczenia](docs/ux-improvements.md) oddzielają te
-wyniki od oczekującego potwierdzenia wdrożenia produkcyjnego.
+wyniki od potwierdzenia wdrożenia produkcyjnego zapisywanego w zadaniu #7.
 
 ## CI/CD
 

@@ -44,6 +44,7 @@ Komputer korzysta z jednej nawigacji bocznej, a telefon z dolnego paska:
 wizualnie i semantycznie. Adres z fragmentem (`#…`) zachowuje ekran i datę
 jadłospisu, a Wstecz/Dalej oraz odświeżenie odtwarzają ten wybór.
 Zmiana ekranu aktualizuje tytuł dokumentu oraz dostępny fokus nagłówka.
+Zmiana samego dnia pozostawia fokus na kontrolce daty.
 Nie jest to nowy routing serwerowy — aplikacja nadal działa jako statyczna
 strona GitHub Pages.
 
@@ -74,7 +75,9 @@ Lista umożliwia filtrowanie produktów do kupienia i kupionych oraz pokazuje
 liczbę pozostałych pozycji. Wiersze mają wygodne pola dotykowe. Zaznaczenie
 produktu zachowuje pozycję przewijania i użyteczny fokus; jeśli filtr usuwa
 pozycję z widoku, fokus nie powinien zniknąć w nieaktywnym elemencie.
-Zbiorcze oznaczenie zakupów można cofnąć. Są to zmiany obsługi istniejącej
+Zbiorcze oznaczenie zakupów można cofnąć. Cofanie jest unieważniane po
+zmianie konta, cyklu lub późniejszej ręcznej edycji, aby nie odtworzyć koszyka
+innego użytkownika lub wcześniejszego cyklu. Są to zmiany obsługi istniejącej
 listy, a nie nowy mechanizm cen, promocji ani eksportu.
 
 ### UX8 — dostępność
@@ -117,7 +120,7 @@ Testy aktualizacji: `node --test scripts/ux.test.mjs`. Pełna regresja:
 
 ## Raport weryfikacji przed wdrożeniem — 2026-10-18
 
-- **77/77 testów zakończonych powodzeniem:** 21 testów aktualizacji UX
+- **79/79 testów zakończonych powodzeniem:** 23 testy aktualizacji UX
   oraz 56 wcześniejszych testów regresji.
 - Kontrola struktury strony `scripts/validate_site.py` zakończona powodzeniem.
 - W przeglądarce sprawdzono szerokości **320, 390, 768 i 1440 px**.

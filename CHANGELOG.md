@@ -1,6 +1,6 @@
 # Historia zmian
 
-## Niewydane — aktualizacja UX, zadanie #7
+## Aktualizacja UX — 2026-10-18, zadanie #7
 
 Wymagania: [#7](https://github.com/kamilsulkowski-code/DietSupportApp/issues/7).
 Zakres i weryfikacja: [macierz UX1–UX9](docs/ux-improvements.md).
@@ -14,10 +14,12 @@ Zakres i weryfikacja: [macierz UX1–UX9](docs/ux-improvements.md).
 - Jawny tryb kalorii automatycznych/ręcznych, szkic i status zapisu ustawień.
 - Możliwość odrzucenia niezapisanych zmian przed uruchomieniem generatora.
 - Filtrowanie zakupów, licznik pozostałych produktów i cofnięcie akcji zbiorczej.
+- Cofanie zakupów jest unieważniane przy zmianie konta, cyklu lub ręcznej edycji;
+  kontrolki daty zachowują fokus podczas zmiany dnia.
 - Obsługa klawiatury w oknie logowania i dostępny wybór celu diety.
 - Usunięcie prywatnego planu i zakupów z widoku również po zewnętrznym
   zdarzeniu wylogowania; blokowanie osobnego przycisku konta podczas modala.
-- 77/77 testów (21 UX i 56 regresji), poprawna kontrola struktury i sprawdzenie
+- 79/79 testów (23 UX i 56 regresji), poprawna kontrola struktury i sprawdzenie
   interfejsu przy 320/390/768/1440 px przed wdrożeniem.
 - Manifest identyfikuje frontend jako aktualizację `ux-7` z bazą v1.0.1,
   bez przesuwania historycznego tagu.
@@ -26,7 +28,7 @@ Zakres i weryfikacja: [macierz UX1–UX9](docs/ux-improvements.md).
   przez samą weryfikację izolowaną.
 
 Bez nowego tagu wydania, migracji SQL i zmian API generatora.
-Wdrożenie i kontrola produkcji oczekują na potwierdzenie w raporcie UX.
+Potwierdzenie wdrożenia i kontroli produkcji jest rejestrowane w zadaniu #7.
 
 ## 1.0.1 — 2026-10-17
 
