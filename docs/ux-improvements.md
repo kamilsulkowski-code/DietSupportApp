@@ -154,9 +154,12 @@ Nie wykonano pomiaru kontrastu ani pełnego audytu WCAG.
 
 Zakres jest frontendowy: nie wymaga migracji bazy ani zastąpienia funkcji
 `generate-plan`. Publikacja korzysta z istniejącego workflow GitHub Pages.
-**Status tego raportu: testy przed wdrożeniem zakończone; wdrożenie i kontrola
-produkcji oczekują na potwierdzenie.** Wynik publikacji trzeba sprawdzić
-w GitHub Actions oraz na stronie produkcyjnej.
+Ten raport dokumentuje zakończone testy przed wdrożeniem. Implementacja i CI:
+[PR #8](https://github.com/kamilsulkowski-code/DietSupportApp/pull/8).
+Potwierdzenie publikacji, identyfikator wdrożonego commitu i odnośniki do
+GitHub Actions są zapisywane po kontroli produkcji w
+[zadaniu #7](https://github.com/kamilsulkowski-code/DietSupportApp/issues/7).
+Sam ten raport nie jest dowodem zakończenia publikacji.
 
 `dist/version.json` zachowuje wersję i historyczny tag 1.0.1, a obiekt
 `frontendUpdate` identyfikuje odrębną aktualizację jako `ux-7`, łączy ją

@@ -8,6 +8,7 @@
   "frontendUpdate": {
     "id": "ux-7",
     "requirement": "https://github.com/kamilsulkowski-code/DietSupportApp/issues/7",
+    "pullRequest": "https://github.com/kamilsulkowski-code/DietSupportApp/pull/8",
     "documentation": "docs/ux-improvements.md",
     "releaseBaseline": "v1.0.1"
   }
