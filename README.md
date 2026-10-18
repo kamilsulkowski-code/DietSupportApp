@@ -20,6 +20,22 @@ Ręcznie podane kalorie mają pierwszeństwo przed oszacowaniem z treningów.
 Plany i wartości odżywcze są orientacyjne. Zmiana założeń nie przepisuje
 historycznych jadłospisów — trzeba wygenerować nowy plan.
 
+## Aktualizacja UX — zadanie #7
+
+[Wymagania i macierz śledzenia](docs/ux-improvements.md) opisują usprawnienia
+stanu jadłospisu i błędów, podsumowania kalorii, nawigacji responsywnej,
+obsługi gościa, formularza ustawień, zakupów oraz dostępności.
+Źródło: [zadanie #7](https://github.com/kamilsulkowski-code/DietSupportApp/issues/7).
+Zmiany są rozwinięciem 1.0.1, nie nowym opublikowanym tagiem wydania.
+Manifest `dist/version.json` rozróżnia aktualizację przez
+`frontendUpdate.id: "ux-7"` i bazę `releaseBaseline: "v1.0.1"`.
+Nie wymagają migracji SQL ani zmiany funkcji Edge. Testy izolowane nie
+zastępują testu z rzeczywistym logowaniem i płatnym AI ani badania użyteczności.
+Weryfikacja przed wdrożeniem: 77/77 testów (21 UX i 56 regresji), kontrola
+struktury strony oraz przegląd szerokości 320/390/768/1440 px zakończone
+powodzeniem. [Raport i ograniczenia](docs/ux-improvements.md) oddzielają te
+wyniki od oczekującego potwierdzenia wdrożenia produkcyjnego.
+
 ## CI/CD
 
 - Każdy pull request i push do `main` uruchamia kontrolę jakości.

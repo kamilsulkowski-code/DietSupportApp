@@ -1,0 +1,26 @@
+import http from 'node:http';
+import {readFileSync} from 'node:fs';
+import {task3Fixture} from './fixtures/task3.mjs';
+
+// The actual UI with deterministic fixtures and an in-memory Supabase stand-in.
+// External scripts/fonts, real auth, persistence and paid AI are disabled.
+const source=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
+const port=Number(process.env.UX_TEST_PORT||4176);
+const scenarios=['demo','current','stale','error'];
+function fixture(){const plan=task3Fixture().plan;const today=new Date();today.setHours(12,0,0,0);plan.content.days.forEach((day,index)=>{const date=new Date(today);date.setDate(date.getDate()+index);day.date=date.toISOString().slice(0,10);day.meals.push({name:'TEST '+day.date+': skyr naturalny',time:'16:00',kcal:220,protein_g:20,fat_g:2,carbs_g:24,ingredients:[{name:'Skyr naturalny',category:'Jaja i nabiał',amount:200,unit:'g',biedronka:true}],preparation:'Przełóż skyr do miseczki.'})});plan.cycle_start=plan.content.days[0].date;plan.cycle_end=plan.content.days.at(-1).date;plan.created_at=new Date().toISOString();return plan}
+const mock=`<script>window.FORMA_SUPABASE={url:'https://isolated.invalid',anonKey:'not-a-real-key'};window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange(){},signInWithOtp:async()=>({error:{message:'Test izolowany — wysyłka e-mail jest wyłączona'}}),signOut:async()=>({error:null})},from:()=>({upsert:async()=>({error:null})}),functions:{invoke:async()=>({data:null,error:{message:'TEST: brak połączenia z generatorem. Nie wykonano zapytania do AI.'}})}})};</script>`;
+http.createServer((req,res)=>{
+ const url=new URL(req.url,`http://127.0.0.1:${port}`),scenario=url.searchParams.get('scenario')||'demo';
+ if(!scenarios.includes(scenario)){res.writeHead(400);res.end('Unknown fixture');return}
+ res.setHeader('Cache-Control','no-store');res.setHeader('Content-Type','text/html; charset=utf-8');
+ if(url.pathname==='/device'){
+  const width=Number(url.searchParams.get('width'));
+  if(![320,390,768,1440].includes(width)){res.writeHead(400);res.end('Unsupported width');return}
+  res.end(`<!doctype html><html lang="pl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Test UX ${width}px</title><body style="margin:0;font:12px system-ui"><output id="deviceDiagnostics" style="display:block;padding:4px;background:#fff0b0">Ładowanie testu ${width}px…</output><div id="deviceFrame" style="overflow:hidden"><iframe id="appFrame" title="Forma — test UX ${width}px" src="/?scenario=${scenario}" style="display:block;width:${width}px;height:1800px;border:0;transform-origin:top left"></iframe></div><script>const frame=document.getElementById('appFrame'),holder=document.getElementById('deviceFrame'),diagnostics=document.getElementById('deviceDiagnostics');function resize(){const available=Math.max(280,document.documentElement.clientWidth-8),scale=Math.min(1,available/${width});frame.style.transform='scale('+scale+')';holder.style.width=Math.min(available,${width})+'px';holder.style.height=(1800*scale)+'px'}function report(){const doc=frame.contentDocument,win=frame.contentWindow;if(!doc||!win)return;const mobile=doc.querySelector('.mobile-nav'),side=doc.querySelector('.side');diagnostics.textContent='Wewnątrz: '+win.innerWidth+'px; dokument: '+doc.documentElement.scrollWidth+'px; body: '+doc.body.scrollWidth+'px; mobile-nav: '+win.getComputedStyle(mobile).display+'; side: '+win.getComputedStyle(side).display;resize()}frame.addEventListener('load',()=>{report();setTimeout(report,100)});window.addEventListener('resize',resize);resize();</script></body></html>`);return;
+ }
+ if(url.pathname!=='/'){res.writeHead(404);res.end();return}
+ const plan=fixture(),shopping={starts_on:plan.cycle_start,ends_on:plan.cycle_end,promotions:[],items:[{category:'Mięso i ryby',name:'Filet z piersi kurczaka',amount:660,unit:'g'},{category:'Produkty suche',name:'Ryż biały',amount:240,unit:'g'},{category:'Jaja i nabiał',name:'Jaja',amount:6,unit:'szt'},{category:'Jaja i nabiał',name:'Skyr naturalny',amount:600,unit:'g'}]};
+ const setup=`state={...defaultSettings,goal:'keep',weight:70,protein:2,calories:2200,mealCount:${scenario==='demo'?4:3},selectedPlanDay:0};checks={};currentUser=${scenario==='demo'?'null':"{id:'isolated-ux-owner',email:'ux@example.invalid'}"};remotePlan=${scenario==='demo'?'null':JSON.stringify(plan)};remoteShopping=${scenario==='demo'?'null':JSON.stringify(shopping)};if(remotePlan)state.planSettingsSnapshot={planId:remotePlan.id,signature:settingsSignature(state)};${scenario==='stale'?'state.calories=2400;':''}render();renderAccount();`;
+ const page=source.replace(/<script src=[^>]+><\/script>/g,'').replace(/@import url\([^)]*\);/g,'').replace('<script>\nconst supabaseConfig=',mock+'\n<script>\nconst supabaseConfig=').replace(/\nrender\(\);\s*\ninitAuth\(\);/,'\n'+setup+'\n').replace('<body>','<body><div style="padding:8px;background:#fff0b0;text-align:center;font:13px system-ui">TEST IZOLOWANY — bez bazy, e-maili i płatnego API. Scenariusz: '+scenario+'</div>');
+ res.end(page);
+}).listen(port,'127.0.0.1',()=>console.log(`Test UX: http://127.0.0.1:${port}/?scenario=demo (demo / current / stale / error)`));
