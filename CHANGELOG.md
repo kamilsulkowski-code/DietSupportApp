@@ -1,5 +1,13 @@
 # Historia zmian
 
+## Czytelność licznika zakupów — 2026-10-19
+
+- Biały tekst licznika na ciemnozielonym tle zamiast szarego nadpisania
+  z ogólnego stylu nagłówka; kontrast wzrasta z 1,63:1 do 8,17:1.
+- Większa, pogrubiona czcionka i dodatkowy odstęp wewnętrzny licznika.
+- Test regresji wymaga osobnego stylu licznika i kontrastu co najmniej 7:1.
+- Zmiana wyłącznie wizualna, bez modyfikacji danych i logiki koszyka.
+
 ## Aktualizacja UX — 2026-10-18, zadanie #7
 
 Wymagania: [#7](https://github.com/kamilsulkowski-code/DietSupportApp/issues/7).
