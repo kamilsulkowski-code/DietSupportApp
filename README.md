@@ -36,6 +36,19 @@ struktury strony oraz przegląd szerokości 320/390/768/1440 px zakończone
 powodzeniem. [Raport i ograniczenia](docs/ux-improvements.md) oddzielają te
 wyniki od potwierdzenia wdrożenia produkcyjnego zapisywanego w zadaniu #7.
 
+## PWA — instalacja aplikacji
+
+Forma ma manifest, ikony instalacyjne, obsługę ograniczonego otwierania offline
+oraz świadome aktualizacje z ochroną niezapisanego formularza.
+W **Ustawieniach → Forma jako aplikacja** są instrukcje dla Safari/iPhone/Maca
+i instalacja przez zgodną przeglądarkę. Zapisane plany AI, logowanie i chmura
+nadal wymagają internetu. Nie ma kolejki synchronizacji zakupów offline.
+[Zakres, instalacja, prywatność i utrzymanie PWA](docs/pwa.md).
+
+Przed publikacją po zmianie plików interfejsu uruchom
+`node scripts/build_pwa.mjs`, potem `node --test scripts/*.test.mjs`.
+CI i Pages odrzucą nieaktualny fingerprint cache.
+
 ## CI/CD
 
 - Każdy pull request i push do `main` uruchamia kontrolę jakości.

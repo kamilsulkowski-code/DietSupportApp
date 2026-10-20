@@ -1,5 +1,19 @@
 # Historia zmian
 
+## PWA — 2026-10-20
+
+- Manifest, ikony 192/512 px i Apple 180 px, uruchamianie standalone oraz
+  panel instalacji w Ustawieniach, z instrukcjami dla Safari/iPhone/Maca.
+- Ograniczony offline shell: interfejs, lokalne ustawienia i przykład planu;
+  brak cache odpowiedzi API, tokenów, kodów logowania i konfiguracji Supabase.
+- Jawny komunikat offline, blokada logowania/generowania bez sieci, bez
+  obietnicy automatycznej synchronizacji lokalnych zmian i zapisanych planów AI.
+- Network-first, fingerprint zawartości shell, cache ograniczony do scope
+  projektu i aktualizacja na żądanie z ochroną szkicu oraz trwających operacji.
+- 24 testy PWA, 104 testy łącznie; CI/Pages sprawdzają build cache, a Pages
+  uruchamia pełną regresję przed publikacją. Bez migracji i zmian Edge.
+- [Instalacja, ograniczenia offline i utrzymanie](docs/pwa.md).
+
 ## Czytelność licznika zakupów — 2026-10-19
 
 - Biały tekst licznika na ciemnozielonym tle zamiast szarego nadpisania

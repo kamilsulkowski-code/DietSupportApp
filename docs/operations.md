@@ -8,6 +8,19 @@
 3. Po scaleniu do `main` workflow „Publikacja na GitHub Pages” publikuje katalog `dist`.
 4. Adres produkcyjny: `https://kamilsulkowski-code.github.io/DietSupportApp/`.
 
+### PWA i aktualność cache
+
+- Po zmianie HTML, JS/CSS PWA, manifestu lub ikon: `node scripts/build_pwa.mjs`.
+- CI/Pages sprawdzają `node scripts/build_pwa.mjs --check`; workflow Pages
+  uruchamia całą regresję przed publikacją. Zapisz wygenerowany `dist/sw.js`
+  razem ze zmianami, nie zmieniaj jego nazwy przy wydaniu.
+- Worker ma scope tylko aplikacji, network-first i allowlistę publicznych
+  plików; nie buforuje API, tokenów ani linków logowania. Aktualizację
+  aktywuje użytkownik, bez automatycznego tracenia szkicu formularza.
+- **Wycofanie PWA wymaga osobnego workera wyrejestrowującego się.** Samo
+  cofnięcie HTML/usunięcie pliku nie usuwa istniejących rejestracji z urządzeń.
+- [Pełny zakres offline, instalacja i procedury PWA](pwa.md).
+
 ## Wydanie 1.0.1 i śledzenie wymagań
 
 - Wymaganie #5 → PR #6 → finalny commit/tag `v1.0.1` → Release i milestone `1.0.1`.

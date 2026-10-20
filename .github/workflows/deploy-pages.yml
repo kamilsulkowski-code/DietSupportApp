@@ -22,6 +22,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Sprawdź wersję cache PWA i regresję przed publikacją
+        run: |
+          node scripts/build_pwa.mjs --check
+          node --test scripts/*.test.mjs
       - uses: actions/configure-pages@v5
         with:
           enablement: true
