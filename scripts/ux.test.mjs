@@ -67,7 +67,7 @@ function domHarness(){
  return document;
 }
 
-function harness({loggedIn=false,plan=null,shopping=null,stored=null,profile=null,invokeError=null,invokePlan=null,hash=''}={}){
+function harness({loggedIn=false,plan=null,shopping=null,stored=null,profile=null,invokeError=null,invokePlan=null,hash='',passwordEnabled=false}={}){
  const document=domHarness(),storage=new Map(),calls={invoke:0,writes:[],history:[],scroll:[]},windowListeners={};
  if(stored)storage.set('forma-settings',JSON.stringify(stored));
  const location={origin:'https://test.invalid',pathname:'/DietSupportApp/',hash,search:''};
@@ -77,7 +77,7 @@ function harness({loggedIn=false,plan=null,shopping=null,stored=null,profile=nul
  const chain={select(){return this},eq(){return this},gte(){return this},order(){return this},limit(){return this},async maybeSingle(){return{data:responsePlan,error:null}}};
  const client={from:table=>table==='profiles'?{...chain,async maybeSingle(){return{data:profile,error:null}},upsert:async row=>{calls.writes.push(row);return{error:null}}}:table==='shopping_cycles'?{...chain,async maybeSingle(){return{data:shopping,error:null}}}:chain,
   functions:{invoke:async()=>{calls.invoke++;if(invokeError)return{data:null,error:invokeError};responsePlan=invokePlan;return{data:{plan:invokePlan},error:null}}},auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange(listener){calls.authListener=listener},signOut:async()=>({error:null})}};
- const window={FORMA_SUPABASE:{url:'https://fake.invalid',anonKey:'isolated-test-only'},supabase:{createClient:()=>client},location,history,scrollTo:value=>calls.scroll.push(value),addEventListener:(type,fn)=>(windowListeners[type]??=[]).push(fn)};
+ const window={FORMA_SUPABASE:{url:'https://fake.invalid',anonKey:'isolated-test-only',passwordAuthEnabled:passwordEnabled},supabase:{createClient:()=>client},location,history,scrollTo:value=>calls.scroll.push(value),addEventListener:(type,fn)=>(windowListeners[type]??=[]).push(fn)};
  const context=vm.createContext({document,window,location,history,URL,URLSearchParams,Date,Map,Set,console,CSS:{escape:String},localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},requestAnimationFrame:fn=>fn()});
  // Avoid session restoration and network-related startup, then seed explicit fixtures.
  const bootless=application.replace(/\nrender\(\);\s*\ninitAuth\(\);/,'\n');
@@ -86,7 +86,7 @@ function harness({loggedIn=false,plan=null,shopping=null,stored=null,profile=nul
  const run=code=>vm.runInContext(code,context);
  context.fixturePlan=plan;context.fixtureShopping=shopping;
  run(`currentUser=${loggedIn?'{id:"ux-test-owner",email:"ux@example.invalid"}':'null'};remotePlan=fixturePlan;remoteShopping=fixtureShopping;${plan||invokePlan?'state={...state,goal:"keep",weight:70,protein:2,calories:2200,mealCount:2,shopDays:3};':''}`);
- return{document,$:selector=>document.querySelector(selector),storage,calls,context,windowListeners,location,run,setResponsePlan:plan=>{responsePlan=plan}};
+ return{document,$:selector=>document.querySelector(selector),storage,calls,context,windowListeners,location,run,client,setResponsePlan:plan=>{responsePlan=plan}};
 }
 
 function planFixture(){const fixture=task3Fixture().plan;const start=new Date();start.setHours(12,0,0,0);fixture.content.days.forEach((day,index)=>{const date=new Date(start);date.setDate(date.getDate()+index);day.date=date.toISOString().slice(0,10)});fixture.cycle_start=fixture.content.days[0].date;fixture.cycle_end=fixture.content.days.at(-1).date;fixture.created_at=new Date().toISOString();return fixture}
@@ -304,4 +304,37 @@ test('UX8: zewnętrzne wylogowanie usuwa prywatny plan i zakupy z widoku',async(
  assert.match(h.$('#planStatus').textContent,/przykład|demonstr|demo/i);
  assert.doesNotMatch(h.$('#mealDetails').innerHTML,/TEST 2026/);
  assert.match(h.$('#generateBtn').textContent,/Zaloguj/i);
+});
+
+test('AUTH6: rzeczywisty formularz domyślnie loguje hasłem w tej samej sesji bez maila',async()=>{
+ const h=harness({passwordEnabled:true});const requests=[];
+ h.client.auth.signInWithPassword=async args=>{requests.push(args);return{data:{session:{user:{id:'ux-test-owner',email:args.email}}}}};
+ h.run('render();renderAccount();requestLogin()');
+ assert.equal(h.$('#loginPasswordField').hidden,false);assert.equal(h.$('#loginCode').disabled,true);
+ h.$('#loginEmail').value=' OWNER@example.invalid ';h.$('#loginPassword').value='fixture-only-passphrase';
+ await h.$('#loginForm').emit('submit');
+ assert.equal(requests.length,1);assert.equal(requests[0].email,'owner@example.invalid');
+ assert.equal(h.run('currentUser.id'),'ux-test-owner');assert.equal(h.$('#loginDialog').hidden,true);assert.equal(h.$('#loginPassword').value,'');
+ assert.equal(h.$('#passwordManage').hidden,false);assert.equal(h.calls.writes.length,0); // No account replacement/profile migration.
+ assert.ok([...h.storage.values()].every(value=>!value.includes('fixture-only-passphrase')));
+});
+
+test('AUTH6: pełny formularz przełącza reset/link/hasło i pozwala ustawić hasło obecnego konta',async()=>{
+ const h=harness({passwordEnabled:true,loggedIn:true});h.run('render();renderAccount()');
+ h.client.auth.getUser=async()=>({data:{user:{id:'ux-test-owner'}}});h.client.auth.updateUser=async()=>({data:{user:{id:'ux-test-owner'}}});
+ await h.$('#passwordManage').click();assert.equal(h.run('loginMethod'),'password-update');
+ h.$('#loginPassword').value='fixture-only-passphrase';h.$('#loginPasswordConfirm').value='fixture-only-passphrase';
+ await h.$('#loginForm').emit('submit');assert.equal(h.$('#loginDialog').hidden,true);
+ h.run('requestLogin()');await h.$('#forgotPassword').click();assert.equal(h.run('loginMethod'),'password-reset');assert.equal(h.$('#loginPassword').disabled,true);
+ await h.$('#backToPassword').click();await h.$('#useEmailLogin').click();assert.equal(h.run('loginMethod'),'email');assert.equal(h.$('#loginSubmit').textContent,'Wyślij link');
+ await h.$('#backToPassword').click();assert.equal(h.$('#loginSubmit').textContent,'Zaloguj się');
+});
+
+test('AUTH6: router nie kasuje callbacku przed inicjalizacją SDK, a szkic hasła chroni odświeżenie',async()=>{
+ const h=harness({passwordEnabled:true,hash:'#access_token=fixture&type=recovery'});
+ assert.equal(h.location.hash,'#access_token=fixture&type=recovery');
+ await h.run('initAuth()');assert.equal(h.location.hash,'#dashboard');
+ h.run('requestLogin()');h.$('#loginPassword').value='fixture-only-passphrase';let prevented=false;
+ h.windowListeners.beforeunload[0]({preventDefault(){prevented=true}});assert.equal(prevented,true);
+ await h.$('#cancelLogin').click();assert.equal(h.$('#loginPassword').value,'');assert.equal(h.$('.shell').inert,false);
 });

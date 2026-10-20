@@ -3,6 +3,10 @@
 Responsywna aplikacja do planowania jadłospisu AI, kalorii, białka i zakupów.
 Frontend działa na GitHub Pages, a logowanie, dane i generator — w Supabase.
 
+Logowanie w PWA: [e-mail i hasło, pierwsze ustawienie oraz odzyskiwanie](docs/password-login.md).
+Samo logowanie hasłem nie wysyła e-maila; ustawienie/odzyskanie nadal podlega
+ograniczeniom poczty Supabase. Nie wymaga migracji danych istniejącego konta.
+
 ## Wersja 1.0.1
 
 - [Wydanie v1.0.1](https://github.com/kamilsulkowski-code/DietSupportApp/releases/tag/v1.0.1)

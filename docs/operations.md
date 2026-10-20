@@ -1,5 +1,11 @@
 # Utrzymanie aplikacji
 
+Logowanie hasłem w PWA (2026-10-21): [instrukcja, macierz testów i ograniczenia](password-login.md).
+Frontend używa `passwordAuthEnabled: true`; nie wymaga zmian SQL/Edge ani
+wyłączenia weryfikacji e-mail. Bez SMTP odzyskiwanie podlega limitom poczty.
+Wycofanie formularza: ustaw flagę na `false`, przebuduj SW i opublikuj przez PR.
+Nie usuwa to haseł ani kont ustawionych wcześniej w Supabase Auth.
+
 ## Publikacja
 
 1. Zmiana trafia do Pull Requesta.

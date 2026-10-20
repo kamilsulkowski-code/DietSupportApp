@@ -1,5 +1,17 @@
 # Historia zmian
 
+## Logowanie hasłem w PWA — 2026-10-21
+
+- Domyślne logowanie e-mailem i hasłem bez opuszczania PWA; istniejące konta,
+  identyfikatory, plany i dane pozostają bez zmian.
+- Ustawienie hasła w zalogowanej sesji oraz link odzyskiwania dla obecnego konta;
+  12–128 znaków, potwierdzenie, sprawdzenie właściciela przez Supabase Auth.
+- Listener recovery przed odczytem sesji; router czeka na SDK i czyści callback.
+- Brak zapisu haseł w storage/URL/logach; ochrona szkicu przy aktualizacji PWA.
+- 21 nowych testów i rozszerzona regresja PWA, 125 łącznie. Nie zmieniono
+  schematu, RLS, Edge, SMTP ani szablonów OTP; reset nadal podlega limitom poczty.
+- [Instrukcja i macierz AUTH1–AUTH6](docs/password-login.md).
+
 ## PWA — 2026-10-20
 
 - Manifest, ikony 192/512 px i Apple 180 px, uruchamianie standalone oraz

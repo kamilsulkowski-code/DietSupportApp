@@ -9,6 +9,12 @@
 
 ## Logowanie i synchronizacja
 
+Aktualizacja 2026-10-21: domyślnie uruchomiono logowanie e-mailem i hasłem
+do istniejącego konta (`passwordAuthEnabled: true`), bez przekierowania z PWA.
+Instrukcja pierwszego ustawienia, odzyskiwanie, testy i ograniczenia poczty:
+[logowanie hasłem](password-login.md). Nie zmieniono szablonów OTP ani SMTP;
+poniższy opis kodu dokumentuje nadal nieaktywną metodę opcjonalną.
+
 Lokalnie przygotowano logowanie jednorazowym kodem z e-maila. Użytkownik wpisuje
 adres, a następnie kod w tej samej karcie aplikacji. Klient wywołuje
 `signInWithOtp`, a potem `verifyOtp` z `type: "email"`. Samo `signInWithOtp`

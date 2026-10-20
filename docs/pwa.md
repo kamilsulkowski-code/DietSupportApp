@@ -27,6 +27,11 @@ instalacji na fizycznym iPhonie/Macu na podstawie samych testów technicznych.
 Skrót lub osobne okno mogą mieć odrębną sesję logowania — w razie potrzeby
 zaloguj się w zainstalowanej aplikacji.
 
+Aktualizacja 2026-10-21: domyślne logowanie hasłem odbywa się bezpośrednio
+w PWA. [Pierwsze ustawienie i odzyskanie hasła](password-login.md) może raz
+wymagać otwarcia wiadomości w Safari; potem wróć do PWA i użyj e-maila/hasła.
+Aktualizacja PWA respektuje również niezapisany formularz hasła.
+
 Źródła: [instrukcja Apple dla Maca](https://support.apple.com/pl-pl/104996),
 [instrukcja Apple dla iPhone’a](https://support.apple.com/guide/iphone/iphea86e5236/ios),
 [instalowalność PWA — MDN](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).

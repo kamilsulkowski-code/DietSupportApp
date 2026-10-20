@@ -7,7 +7,7 @@
   let deferredInstall=null,registration=null,reloadRequested=false;
   let hadController=!!navigator.serviceWorker?.controller,activeUpdate=false;
   const standalone=()=>window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true;
-  const busy=()=>typeof settingsDirty!=='undefined'&&settingsDirty||typeof generatingPlan!=='undefined'&&generatingPlan||typeof authBusy!=='undefined'&&authBusy;
+  const busy=()=>typeof settingsDirty!=='undefined'&&settingsDirty||typeof generatingPlan!=='undefined'&&generatingPlan||typeof authBusy!=='undefined'&&authBusy||typeof passwordFormDirty==='function'&&passwordFormDirty();
   function showStatus(text){status.textContent=text}
   function canReload(){if(busy()){const message='Najpierw zapisz lub odrzuć szkic i zaczekaj na zakończenie bieżącej operacji.';showStatus(message);updateNotice.hidden=false;updateMessage.textContent=message;return false}return true}
   function networkState(){

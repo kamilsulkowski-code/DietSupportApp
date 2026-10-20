@@ -122,13 +122,13 @@ test('PWA5: fingerprint pokrywa szablon i każdy plik shell; CI wykrywa nieaktua
  assert.match(output,/current/);
 });
 
-function clientHarness({online=true,supported=true,secure=true,standalone=false,waiting=false,controlled=false,dirty=false,generating=false,auth=false,rejectRegistration=false}={}){
+function clientHarness({online=true,supported=true,secure=true,standalone=false,waiting=false,controlled=false,dirty=false,generating=false,auth=false,passwordDraft=false,rejectRegistration=false}={}){
  const elements=new Map(),windowListeners={},swListeners={},registrationListeners={},calls={register:[],posts:[],reload:0,render:0,update:0};
  const get=id=>{if(!elements.has(id))elements.set(id,{hidden:id!=='pwaInstall',disabled:false,textContent:'',listeners:{},addEventListener(type,fn){this.listeners[type]=fn}});return elements.get(id)};
  const registration={waiting:waiting?{postMessage:value=>calls.posts.push(value)}:null,installing:null,addEventListener:(type,fn)=>registrationListeners[type]=fn,update:async()=>{calls.update++}};
  const navigator={onLine:online,standalone};
  if(supported)navigator.serviceWorker={controller:controlled?{}:null,ready:Promise.resolve(registration),addEventListener:(type,fn)=>swListeners[type]=fn,register:async(...args)=>{calls.register.push(args);if(rejectRegistration)throw Error('unsupported');return registration}};
- const context=vm.createContext({document:{baseURI:base+'#settings',getElementById:get},window:{isSecureContext:secure,matchMedia:()=>({matches:standalone}),addEventListener:(type,fn)=>windowListeners[type]=fn},navigator,URL,location:{reload:()=>calls.reload++},settingsDirty:dirty,generatingPlan:generating,authBusy:auth,renderAccount:()=>calls.render++});
+ const context=vm.createContext({document:{baseURI:base+'#settings',getElementById:get},window:{isSecureContext:secure,matchMedia:()=>({matches:standalone}),addEventListener:(type,fn)=>windowListeners[type]=fn},navigator,URL,location:{reload:()=>calls.reload++},settingsDirty:dirty,generatingPlan:generating,authBusy:auth,passwordFormDirty:()=>passwordDraft,renderAccount:()=>calls.render++});
  vm.runInContext(client,context);
  return{get,calls,context,registration,navigator,swListeners,registrationListeners,windowListeners,click:id=>get(id).listeners.click(),flush:()=>new Promise(resolve=>setImmediate(resolve))};
 }
@@ -178,7 +178,7 @@ test('PWA8: oczekująca wersja pokazuje globalny przycisk, ale nie aktywuje się
 });
 
 test('PWA8: szkic, generowanie i logowanie blokują aktualizację bez utraty danych',async()=>{
- for(const flags of [{dirty:true},{generating:true},{auth:true}]){
+ for(const flags of [{dirty:true},{generating:true},{auth:true},{passwordDraft:true}]){
   const h=clientHarness({waiting:true,controlled:true,...flags});await h.flush();await h.click('pwaUpdateNow');assert.equal(h.calls.posts.length,0);assert.equal(h.calls.reload,0);assert.match(h.get('pwaUpdateMessage').textContent,/Najpierw zapisz/);
  }
 });

@@ -1,5 +1,5 @@
 /* Generated as dist/sw.js by scripts/build_pwa.mjs. Do not rename the deployed worker. */
-const BUILD = '6fc96a96d7f1a85d7473';
+const BUILD = '236e59d94a3c556710c9';
 const BASE = new URL('./', self.registration.scope);
 const PREFIX = 'forma-pwa:' + BASE.href + ':';
 const CACHE = PREFIX + BUILD;
