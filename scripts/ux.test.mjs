@@ -232,6 +232,22 @@ test('UX7: pojedynczy checkbox aktualizuje stan bez zastępowania listy i utraty
  assert.equal(checkbox.closest('.shop-item').hidden,true);
 });
 
+test('UX7: licznik zakupów ma jawny kontrastowy kolor ponad ogólnym stylem nagłówka',()=>{
+ const rule=html.match(/\.shop-header\s+\.badge\s*\{([^}]+)\}/);
+ assert.ok(rule,'Brak reguły o specyficzności wyższej niż .shop-header span');
+ const declarations=Object.fromEntries(rule[1].split(';').filter(Boolean).map(item=>item.split(':').map(value=>value.trim())));
+ assert.match(declarations.color,/^#(?:fff|ffffff)$/i);
+ assert.equal(declarations.background?.toLowerCase(),'#0e5a46');
+ const luminance=hex=>{
+  const expanded=hex.length===4?'#'+[...hex.slice(1)].map(value=>value+value).join(''):hex;
+  const [red,green,blue]=expanded.slice(1).match(/../g).map(value=>parseInt(value,16)/255).map(value=>value<=0.04045?value/12.92:((value+0.055)/1.055)**2.4);
+  return 0.2126*red+0.7152*green+0.0722*blue;
+ };
+ const foreground=luminance(declarations.color),background=luminance(declarations.background);
+ const contrast=(Math.max(foreground,background)+0.05)/(Math.min(foreground,background)+0.05);
+ assert.ok(contrast>=7,`Kontrast licznika zakupów wynosi tylko ${contrast.toFixed(2)}:1`);
+});
+
 test('UX7: oznaczenie wszystkich zakupów można cofnąć do dokładnego poprzedniego stanu',async()=>{
  const shopping={starts_on:'2026-10-18',ends_on:'2026-10-20',items:[{category:'Produkty suche',name:'Ryż biały',amount:240,unit:'g'},{category:'Nabiał',name:'Skyr',amount:200,unit:'g'}],promotions:[]};
  const h=harness({plan:planFixture(),shopping});h.run('checks={"Skyr":true};renderShopping()');
