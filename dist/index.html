@@ -49,7 +49,21 @@
   </div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<div class="dialog" id="loginDialog" role="dialog" aria-modal="true" aria-labelledby="loginTitle" hidden><form class="dialog-card" id="loginForm"><h2 id="loginTitle">Zaloguj się</h2><p id="loginHint">Wyślemy jednorazowy kod. Wpisz go tutaj, bez otwierania linku ani innej przeglądarki.</p><label class="field" for="loginEmail">Adres e-mail<input id="loginEmail" type="email" autocomplete="email" required placeholder="ty@przyklad.pl"></label><label class="field" id="loginCodeField" for="loginCode" hidden>Kod z e-maila<input id="loginCode" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" placeholder="Wpisz kod" disabled></label><p id="loginMessage" role="status" aria-live="polite" style="margin:12px 0 0"></p><div class="dialog-actions" id="loginCodeActions" hidden><button class="text-link" id="changeLoginEmail" type="button">Zmień e-mail</button><button class="text-link" id="resendLoginCode" type="button">Wyślij ponownie</button></div><div class="dialog-actions"><button class="secondary" id="cancelLogin" type="button">Anuluj</button><button class="primary" id="loginSubmit" type="submit">Wyślij kod</button></div></form></div>
+<div class="dialog" id="loginDialog" role="dialog" aria-modal="true" aria-labelledby="loginTitle" hidden>
+ <form class="dialog-card" id="loginForm">
+  <h2 id="loginTitle">Zaloguj się</h2><p id="loginHint">Zaloguj się bezpośrednio w aplikacji.</p>
+  <label class="field" for="loginEmail">Adres e-mail<input id="loginEmail" type="email" autocomplete="email" required placeholder="ty@przyklad.pl"></label>
+  <label class="field" id="loginPasswordField" for="loginPassword" hidden>Hasło<input id="loginPassword" type="password" autocomplete="current-password" maxlength="128" disabled></label>
+  <label class="field" id="loginPasswordConfirmField" for="loginPasswordConfirm" hidden>Powtórz nowe hasło<input id="loginPasswordConfirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" disabled></label>
+  <label class="field" id="loginCodeField" for="loginCode" hidden>Kod z e-maila<input id="loginCode" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" placeholder="Wpisz kod" disabled></label>
+  <p id="loginMessage" role="status" aria-live="polite" style="margin:12px 0 0"></p>
+  <div class="dialog-actions" id="passwordAuthActions" hidden><button class="text-link" id="forgotPassword" type="button">Nie mam / nie pamiętam hasła</button><button class="text-link" id="useEmailLogin" type="button">Zaloguj linkiem lub kodem</button></div>
+  <div class="dialog-actions" id="passwordBackActions" hidden><button class="text-link" id="backToPassword" type="button">Wróć do logowania hasłem</button></div>
+  <div class="dialog-actions" id="loginCodeActions" hidden><button class="text-link" id="changeLoginEmail" type="button">Zmień e-mail</button><button class="text-link" id="resendLoginCode" type="button">Wyślij ponownie</button></div>
+  <div class="dialog-actions"><button class="secondary" id="cancelLogin" type="button">Anuluj</button><button class="primary" id="loginSubmit" type="submit">Zaloguj się</button></div>
+ </form>
+</div>
+<style>#loginPasswordField[hidden],#loginPasswordConfirmField[hidden],#passwordAuthActions[hidden],#passwordBackActions[hidden]{display:none}#loginPasswordField,#loginPasswordConfirmField{margin-top:14px}#loginPassword,#loginPasswordConfirm{width:100%}#passwordAuthActions,#passwordBackActions{flex-wrap:wrap;gap:12px}.dialog-card{max-height:calc(100dvh - 40px);overflow-y:auto}#passwordManage{margin-top:16px}</style>
 <style>#loginCodeField[hidden],#loginCodeActions[hidden]{display:none}#loginCodeField{margin-top:14px}#loginCode{width:100%;letter-spacing:.12em}#loginCodeActions{flex-wrap:wrap;justify-content:space-between}#loginMessage{overflow-wrap:anywhere}button:disabled{cursor:wait;opacity:.6}.meal-macros{padding:0 15px 12px;font-size:.76rem;color:var(--muted);overflow-wrap:anywhere}#dayTotals{white-space:normal;max-width:330px}.meal-summary strong,.meal-row strong{overflow-wrap:anywhere}.meal-summary>div:nth-child(2),.meal-row>div:nth-child(2){min-width:0}.meal-photo svg{max-width:100%}</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./supabase-config.js"></script>
@@ -57,6 +71,11 @@
 const supabaseConfig=window.FORMA_SUPABASE||{};
 // Enable only after both Supabase email templates send {{ .Token }}.
 const loginCodeEnabled=supabaseConfig.emailOtpEnabled===true;
+const passwordAuthEnabled=supabaseConfig.passwordAuthEnabled===true;
+let loginMethod=passwordAuthEnabled?"password":"email";
+let passwordRecovery=false;
+let authCallbackPending=hasAuthCallback();
+const recoveryCallbackExpected=new URLSearchParams(location.hash.slice(1)).get("type")==="recovery";
 const db=supabaseConfig.url&&supabaseConfig.anonKey&&window.supabase?window.supabase.createClient(supabaseConfig.url,supabaseConfig.anonKey):null;
 let currentUser=null;
 let authBusy=false;
@@ -88,6 +107,12 @@ async function syncToCloud(){if(!db||!currentUser)return false;if(typeof navigat
 async function restoreFromCloud(){if(!db||!currentUser)return;try{const {data,error}=await db.from("profiles").select("settings,shopping_state").eq("id",currentUser.id).maybeSingle();if(error)throw error;if(data){undoShopping=null;state={...defaultSettings,...data.settings};checks=data.shopping_state||{};localStorage.setItem("forma-settings",JSON.stringify(state));localStorage.setItem("forma-shopping",JSON.stringify(checks));await restoreRemotePlan();render();applyRoute();$("#syncStatus").hidden=false;$("#syncStatus").textContent="Dane pobrane z chmury."}else await syncToCloud()}catch{$("#syncStatus").hidden=false;$("#syncStatus").textContent="Nie udało się pobrać danych z chmury. Widoczne dane mogą być nieaktualne.";$("#syncStatus").classList.add("error")}}
 async function restoreRemotePlan(){if(!db||!currentUser)return;const {data,error}=await db.from("meal_plans").select("id,cycle_start,cycle_end,target_kcal,target_protein_g,content,created_at").gte("cycle_end",todayDate()).order("created_at",{ascending:false}).limit(1).maybeSingle();if(error)throw error;let shopping=null;if(data){const result=await db.from("shopping_cycles").select("items,promotions,promotion_source_url,starts_on,ends_on").eq("plan_id",data.id).maybeSingle();if(result.error)throw result.error;shopping=result.data||null}if(remotePlan?.id!==data?.id)undoShopping=null;remotePlan=data||null;remoteShopping=shopping}
 function renderLogin(){
+ $("#loginTitle").textContent="Zaloguj się";
+ if(passwordAuthEnabled&&loginMethod!=="email"){renderPasswordLogin();return}
+ $("#loginPasswordField").hidden=true;$("#loginPasswordConfirmField").hidden=true;
+ $("#loginPassword").disabled=true;$("#loginPassword").required=false;$("#loginPasswordConfirm").disabled=true;$("#loginPasswordConfirm").required=false;
+ $("#passwordAuthActions").hidden=true;$("#passwordBackActions").hidden=!passwordAuthEnabled;
+ $("#backToPassword").disabled=authBusy;$("#loginEmail").required=true;$("#loginEmail").readOnly=false;
  if(!loginCodeEnabled){$("#loginHint").textContent="Wyślemy jednorazowy link, aby zsynchronizować Twój plan między urządzeniami.";$("#loginSubmit").textContent=authBusy?"Wysyłanie…":"Wyślij link";$("#loginSubmit").disabled=authBusy;$("#loginEmail").disabled=authBusy;$("#cancelLogin").disabled=authBusy;return}
  const codeStep=loginStep==="code",email=codeStep?loginPendingEmail:$("#loginEmail").value.trim().toLowerCase();
  const seconds=Math.max(0,Math.ceil(((loginResendAfter.get(email)||0)-Date.now())/1000));
@@ -101,9 +126,9 @@ function renderLogin(){
  $("#loginHint").textContent=codeStep?"Kod został wysłany na "+loginPendingEmail+". Wpisz go poniżej; sprawdź też folder spam.":"Wyślemy jednorazowy kod. Wpisz go tutaj, bez otwierania linku ani innej przeglądarki.";
 }
 function loginMessage(message){$("#loginMessage").textContent=message}
-function resetLogin(){loginStep="email";loginPendingEmail="";$("#loginCode").value="";loginMessage("");clearInterval(loginCooldownTimer);loginCooldownTimer=null;renderLogin()}
+function resetLogin(){loginStep="email";loginPendingEmail="";loginMethod=passwordAuthEnabled?"password":"email";clearPasswordFields();$("#loginCode").value="";loginMessage("");clearInterval(loginCooldownTimer);loginCooldownTimer=null;renderLogin()}
 function requestLogin(){if(typeof navigator!=="undefined"&&navigator.onLine===false){$("#generationStatus").hidden=false;$("#generationStatus").textContent="Logowanie wymaga połączenia z internetem.";return}if(!db){$("#generationStatus").hidden=false;$("#generationStatus").textContent="Logowanie jest niedostępne: brak konfiguracji Supabase.";return}if(authBusy)return;lastLoginFocus=document.activeElement;$("#loginDialog").hidden=false;$(".shell").inert=true;$("#accountButton").inert=true;renderLogin();clearInterval(loginCooldownTimer);loginCooldownTimer=setInterval(renderLogin,1000);$(loginStep==="code"?"#loginCode":"#loginEmail").focus()}
-function closeLogin(force=false){if(authBusy&&!force)return;$("#loginDialog").hidden=true;$(".shell").inert=false;$("#accountButton").inert=false;resetLogin();if(lastLoginFocus?.isConnected)lastLoginFocus.focus();lastLoginFocus=null}
+function closeLogin(force=false){if(authBusy&&!force)return;passwordRecovery=false;$("#loginDialog").hidden=true;$(".shell").inert=false;$("#accountButton").inert=false;resetLogin();if(lastLoginFocus?.isConnected)lastLoginFocus.focus();lastLoginFocus=null}
 function trapLoginFocus(event){if($("#loginDialog").hidden)return;if(event.key==="Escape"){event.preventDefault();closeLogin();return}if(event.key!=="Tab")return;const focusable=[...$("#loginDialog").querySelectorAll("input:not([disabled]),button:not([disabled]),[tabindex='0']")].filter(el=>!el.closest("[hidden]"));if(!focusable.length){event.preventDefault();return}const first=focusable[0],last=focusable[focusable.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}
 function loginError(error,verification=false){
  if(error.code==="over_email_send_rate_limit"||error.code==="over_request_rate_limit"||error.status===429||/rate limit/i.test(error.message||""))return "Osiągnięto limit Supabase. Spróbuj później. Ponowne wysłanie kodu również podlega limitom poczty.";
@@ -132,8 +157,85 @@ async function sendLegacyLoginLink(email){
  catch(error){loginMessage(loginError(error))}
  finally{authBusy=false;renderAccount();renderLogin()}
 }
-function renderAccount(){const e=$("#accountButton");if(!e)return;const offline=typeof navigator!=="undefined"&&navigator.onLine===false;e.disabled=authBusy||generatingPlan||(!currentUser&&offline);$("#generateBtn").disabled=generatingPlan||offline;e.textContent=authBusy?"Proszę czekać…":currentUser?"Wyloguj · "+currentUser.email:"Zaloguj się";e.title=currentUser?"Wyloguj":"Zaloguj się, aby synchronizować dane";if($("#generateBtn"))$("#generateBtn").textContent=generatingPlan?"Tworzenie planu AI…":currentUser?"Wygeneruj plan":"Zaloguj się i wygeneruj plan"}
-async function initAuth(){if(!db){renderAccount();return}try{const {data:{session},error}=await db.auth.getSession();if(error)throw error;currentUser=session?.user||null;renderAccount();if(currentUser)await restoreFromCloud();db.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null;renderAccount();if(currentUser)restoreFromCloud();else{remotePlan=null;remoteShopping=null;undoShopping=null;checks={};render()}})}catch{$("#syncStatus").hidden=false;$("#syncStatus").textContent="Nie udało się sprawdzić sesji logowania. Odśwież stronę, aby ponowić.";$("#syncStatus").classList.add("error")}}
+function renderAccount(){const e=$("#accountButton");if(!e)return;const offline=typeof navigator!=="undefined"&&navigator.onLine===false;e.disabled=authBusy||generatingPlan||(!currentUser&&offline);$("#generateBtn").disabled=generatingPlan||offline;e.textContent=authBusy?"Proszę czekać…":currentUser?"Wyloguj · "+currentUser.email:"Zaloguj się";e.title=currentUser?"Wyloguj":"Zaloguj się, aby synchronizować dane";if($("#passwordManage")){$("#passwordManage").hidden=!passwordAuthEnabled||!currentUser;$("#passwordManage").disabled=authBusy||offline||generatingPlan}if($("#generateBtn"))$("#generateBtn").textContent=generatingPlan?"Tworzenie planu AI…":currentUser?"Wygeneruj plan":"Zaloguj się i wygeneruj plan"}
+function clearPasswordFields(){$("#loginPassword").value="";$("#loginPasswordConfirm").value=""}
+function renderPasswordLogin(){
+ const updating=loginMethod==="password-update",resetting=loginMethod==="password-reset";
+ $("#loginTitle").textContent=updating?"Ustaw hasło":resetting?"Ustawienie lub odzyskanie hasła":"Zaloguj się hasłem";
+ $("#loginHint").textContent=updating?"Hasło dotyczy obecnego konta — Twoje dane pozostają bez zmian. Użyj 12–128 znaków. Po zapisaniu wróć do PWA i zaloguj się tym hasłem.":resetting?"Podaj e-mail obecnego konta. Link ustawienia hasła może otworzyć Safari — po ustawieniu wróć do PWA. Wysyłka podlega limitom Supabase.":"Wpisz e-mail i hasło. Zalogujesz się tutaj, bez wiadomości i przekierowania do przeglądarki. Pierwszy raz? Wybierz „Nie mam / nie pamiętam hasła”.";
+ $("#loginEmail").required=!updating;$("#loginEmail").readOnly=updating;$("#loginEmail").disabled=authBusy;
+ if(updating)$("#loginEmail").value=currentUser?.email||"";
+ $("#loginCodeField").hidden=true;$("#loginCodeActions").hidden=true;$("#loginCode").required=false;$("#loginCode").disabled=true;
+ $("#loginPasswordField").hidden=resetting;$("#loginPasswordConfirmField").hidden=!updating;
+ $("#loginPassword").disabled=authBusy||resetting;$("#loginPassword").required=!resetting;$("#loginPassword").minLength=updating?12:1;$("#loginPassword").autocomplete=updating?"new-password":"current-password";
+ $("#loginPasswordConfirm").disabled=authBusy||!updating;$("#loginPasswordConfirm").required=updating;
+ $("#passwordAuthActions").hidden=updating||resetting;$("#passwordBackActions").hidden=updating||!resetting;
+ $("#useEmailLogin").textContent=loginCodeEnabled?"Zaloguj kodem z e-maila":"Zaloguj linkiem z e-maila";
+ for(const id of ["forgotPassword","useEmailLogin","backToPassword","cancelLogin"])$("#"+id).disabled=authBusy;
+ const seconds=Math.max(0,Math.ceil(((loginResendAfter.get($("#loginEmail").value.trim().toLowerCase())||0)-Date.now())/1000));
+ $("#loginSubmit").disabled=authBusy||(resetting&&seconds>0);
+ $("#loginSubmit").textContent=authBusy?"Proszę czekać…":updating?"Zapisz hasło":resetting?(seconds?`Wyślij link za ${seconds} s`:"Wyślij link ustawienia hasła"):"Zaloguj się";
+}
+function chooseLoginMethod(method){if(authBusy)return;clearPasswordFields();$("#loginCode").value="";loginStep="email";loginPendingEmail="";loginMethod=method;loginMessage("");renderLogin();$("#loginEmail").focus()}
+function openPasswordEditor(){if(!passwordAuthEnabled||!currentUser||authBusy||generatingPlan||!authOnline())return;loginMethod="password-update";clearPasswordFields();requestLogin();$("#loginPassword").focus()}
+function passwordFormDirty(){return !$("#loginDialog").hidden&&!!($("#loginPassword").value||$("#loginPasswordConfirm").value||passwordRecovery)}
+function authOnline(){return typeof navigator==="undefined"||navigator.onLine!==false}
+function passwordError(error,updating=false){
+ if(error?.status===429||/rate.?limit/i.test(error?.code||"")||/rate limit/i.test(error?.message||""))return "Osiągnięto limit Supabase. Zaczekaj przed kolejną próbą. Wiadomości ustawienia hasła podlegają limitom poczty.";
+ if(error?.code==="invalid_credentials"||error?.code==="email_not_confirmed")return "Nie udało się zalogować. Sprawdź e-mail i hasło oraz potwierdzenie adresu. Jeśli nie masz hasła, wybierz jego ustawienie.";
+ if(error?.code==="weak_password")return "Hasło nie spełnia zasad bezpieczeństwa Supabase. Wybierz dłuższe, unikalne hasło.";
+ if(error?.code==="same_password")return "Wybierz inne hasło niż dotychczasowe.";
+ if(updating&&(error?.status===401||error?.status===403||error?.code==="session_not_found"))return "Sesja wygasła. Zaloguj się ponownie lub otwórz nowy link ustawienia hasła.";
+ return updating?"Nie udało się zapisać hasła. Sprawdź połączenie i ważność sesji; spróbuj ponownie.":"Nie udało się zalogować. Sprawdź połączenie i spróbuj ponownie.";
+}
+async function signInWithPassword(email,password){
+ if(authBusy||!db)return false;
+ if(!authOnline()){clearPasswordFields();loginMessage("Logowanie wymaga połączenia z internetem.");return false}
+ email=email.trim().toLowerCase();if(!email||!password||password.length>128){loginMessage("Podaj e-mail i hasło (maksymalnie 128 znaków).");return false}
+ authBusy=true;loginMessage("");renderAccount();renderLogin();
+ try{const {data,error}=await db.auth.signInWithPassword({email,password});if(error)throw error;if(!data?.session?.user)throw new Error("No session");currentUser=data.session.user;closeLogin(true);toast("Zalogowano. Twój plan jest synchronizowany.");return true}
+ catch(error){loginMessage(passwordError(error));return false}
+ finally{password="";clearPasswordFields();authBusy=false;renderAccount();renderLogin()}
+}
+async function requestPasswordReset(email){
+ if(authBusy||!db)return false;if(!authOnline()){loginMessage("Wysłanie linku wymaga internetu.");return false}
+ email=email.trim().toLowerCase();if(!email){loginMessage("Podaj e-mail obecnego konta.");return false}
+ if(Date.now()<(loginResendAfter.get(email)||0)){renderLogin();loginMessage("Zaczekaj przed ponownym wysłaniem wiadomości.");return false}
+ authBusy=true;clearPasswordFields();loginMessage("");renderAccount();renderLogin();
+ try{const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});if(error)throw error;loginResendAfter.set(email,Date.now()+60000);loginMessage("Jeśli konto istnieje i wysyłka jest dozwolona, otrzymasz link ustawienia hasła. Otwórz najnowszą wiadomość w Safari, ustaw hasło i wróć do PWA. Sprawdź też spam. Wiadomość może podlegać ograniczeniom dostawcy poczty.");return true}
+ catch(error){if(error?.status===429||/rate.?limit/i.test(error?.code||""))loginResendAfter.set(email,Date.now()+60000);loginMessage(error?.status===429||/rate.?limit/i.test(error?.code||"")?passwordError(error):"Nie udało się wysłać linku. Sprawdź połączenie; wbudowana poczta Supabase ma ograniczenia odbiorców i wysyłki.");return false}
+ finally{authBusy=false;renderAccount();renderLogin()}
+}
+async function saveAccountPassword(password,confirmation){
+ if(authBusy||!db)return false;
+ if(!authOnline()){clearPasswordFields();loginMessage("Zapisanie hasła wymaga internetu.");return false}
+ if(!currentUser){clearPasswordFields();loginMessage("Zaloguj się lub otwórz ważny link ustawienia hasła.");return false}
+ if(password.length<12||password.length>128){loginMessage("Nowe hasło musi mieć 12–128 znaków.");return false}
+ if(password!==confirmation){loginMessage("Wpisane hasła nie są identyczne.");return false}
+ const owner=currentUser.id;authBusy=true;loginMessage("");renderAccount();renderLogin();
+ try{const {data:verified,error:sessionError}=await db.auth.getUser();if(sessionError)throw sessionError;if(verified?.user?.id!==owner)throw {code:"session_not_found"};const {data,error}=await db.auth.updateUser({password});if(error)throw error;if(data?.user?.id!==owner)throw new Error("No matching user");passwordRecovery=false;closeLogin(true);toast("Hasło zapisane. Otwórz PWA i zaloguj się e-mailem oraz tym hasłem.");return true}
+ catch(error){loginMessage(passwordError(error,true));return false}
+ finally{password="";confirmation="";clearPasswordFields();authBusy=false;renderAccount();renderLogin()}
+}
+function hasAuthCallback(){const hash=new URLSearchParams(location.hash.slice(1)),query=new URLSearchParams(location.search);return hash.has("access_token")||hash.has("error")||hash.has("error_code")||query.has("code")}
+function finishAuthCallback(){authCallbackPending=false;if(hasAuthCallback()){const query=new URLSearchParams(location.search);query.delete("code");history.replaceState({},"",location.pathname+(query.size?"?"+query.toString():"")+"#dashboard")}}
+async function initAuth(){
+ if(!db){authCallbackPending=false;renderAccount();applyRoute();return}
+ const failedCallback=new URLSearchParams(location.hash.slice(1)).has("error");
+ try{
+  // Subscribe before getSession consumes recovery URLs. Never await SDK/DB calls inside its auth lock.
+  db.auth.onAuthStateChange((event,session)=>{
+   currentUser=session?.user||null;renderAccount();
+   if(event==="PASSWORD_RECOVERY"&&currentUser){passwordRecovery=true;openPasswordEditor()}
+   if(currentUser)setTimeout(()=>restoreFromCloud(),0);
+   else{passwordRecovery=false;if(!$("#loginDialog").hidden)closeLogin(true);remotePlan=null;remoteShopping=null;undoShopping=null;checks={};render()}
+  });
+  const {data:{session},error}=await db.auth.getSession();if(error)throw error;currentUser=session?.user||null;
+  finishAuthCallback();renderAccount();applyRoute();
+  if(currentUser){if(passwordRecovery)openPasswordEditor();await restoreFromCloud()}
+  if(failedCallback||recoveryCallbackExpected&&!currentUser){requestLogin();loginMessage("Link ustawienia hasła lub logowania jest nieprawidłowy, wykorzystany albo wygasł. Poproś o nowy link.")}
+ }catch{finishAuthCallback();renderAccount();applyRoute();$("#syncStatus").hidden=false;$("#syncStatus").textContent="Nie udało się sprawdzić sesji logowania. Odśwież stronę, aby ponowić.";$("#syncStatus").classList.add("error")}
+}
 function goalName(g){return {cut:"Redukcja",gain:"Budowa mięśni",keep:"Utrzymanie"}[g]}
 function trainingCount(value){if(value===undefined||value===null)return 0;if((typeof value!=="number"&&typeof value!=="string")||(typeof value==="string"&&!value.trim()))throw new Error("Podaj liczbę treningów od 0 do 14, co 0,5.");const count=Number(value);if(!Number.isFinite(count)||count<0||count>14||!Number.isInteger(count*2))throw new Error("Podaj liczbę treningów od 0 do 14, co 0,5.");return count}
 function calorieTarget(settings){const trainings=trainingCount(settings.trainingsPerWeek);if(settings.calories)return Number(settings.calories);const multiplier=settings.goal==="gain"?34:settings.goal==="cut"?28:31;return Math.max(1500,Math.round(Number(settings.weight)*(multiplier+2.5*trainings/7)))}
@@ -166,7 +268,7 @@ function readSettingsForm(){const settings={...state,goal:draftGoal||state.goal}
 function markSettingsDirty(){settingsDirty=true;$("#discardSettings").hidden=false;$("#saveStatus").textContent="Masz niezapisane zmiany.";updateCalorieEstimate()}
 function updateCalorieMode(){const manual=$("#calorieMode").value==="manual";$("#calories").disabled=!manual;$("#calories").required=manual;$("#calorieHint").textContent=manual?"Wpisany cel ma pierwszeństwo przed wyliczeniem z treningów.":"Obliczamy cel z wagi, celu diety i treningów. Własne kalorie są wyłączone."}
 function readRoute(){const [view,query=""]=location.hash.slice(1).split("?");return {view:["dashboard","day","shopping","settings"].includes(view)?view:"dashboard",date:new URLSearchParams(query).get("date")}}
-function applyRoute(event){const route=readRoute();if(route.view==="day"&&route.date){const index=(remotePlan?.content?.days||[]).findIndex(day=>day.date===route.date);if(index>=0)state.selectedPlanDay=index}renderDay();navigate(route.view,false,!!event)}
+function applyRoute(event){if(authCallbackPending)return;const route=readRoute();if(route.view==="day"&&route.date){const index=(remotePlan?.content?.days||[]).findIndex(day=>day.date===route.date);if(index>=0)state.selectedPlanDay=index}renderDay();navigate(route.view,false,!!event)}
 function updateShoppingState(){const active=document.activeElement,flat=Object.values(plannedShopping()).flat(),done=flat.filter(item=>checks[item.name]).length,filter=$("#shoppingFilter").value||"all";$("#shopProgress").textContent=done+" / "+flat.length+" w koszyku";$("#shoppingRemaining").textContent="Do kupienia: "+(flat.length-done);$$("#categories .shop-item").forEach(row=>{const input=row.querySelector("input"),checked=!!checks[input.dataset.item];input.checked=checked;row.classList.toggle("checked",checked);row.hidden=filter==="pending"&&checked||filter==="done"&&!checked});$$("#categories .category").forEach(category=>category.hidden=![...category.querySelectorAll(".shop-item")].some(row=>!row.hidden));$("#undoShop").hidden=!undoShopping;$("#completeShop").disabled=!flat.length||done===flat.length;$("#shoppingEmpty").hidden=$$("#categories .shop-item").some(row=>!row.hidden);if(active?.dataset?.item&&active.closest(".shop-item")?.hidden){const remaining=$$("#categories .shop-item").find(row=>!row.hidden);(remaining?.querySelector("input")||$("#shoppingFilter")).focus({preventScroll:true})}}
 function plannedShopping(){if(remoteShopping?.items?.length)return remoteShopping.items.reduce((groups,item)=>{const normalized={...item,emoji:"🛒"};(groups[normalized.category]??=[]).push(normalized);return groups},{});const days=Number(state.shopDays)||3,items={};currentPlan().meals.forEach(meal=>meal.cart.forEach(([category,emoji,name,amount,unit])=>{const key=category+"|"+name+"|"+unit;if(!items[key])items[key]={category,emoji,name,amount:0,unit};items[key].amount+=amount*days}));return Object.values(items).reduce((groups,item)=>{(groups[item.category]??=[]).push(item);return groups},{})}
 function shoppingRange(days){const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(start.getDate()+days-1);const format=date=>date.toLocaleDateString("pl-PL",{day:"numeric",month:"long"});return format(start)+" – "+format(end)}
@@ -185,10 +287,15 @@ $("#generateBtn").addEventListener("click",async()=>{if(await generatePlan())nav
 document.body.insertAdjacentHTML("beforeend","<style>.account{position:fixed;right:20px;top:18px;z-index:7;border:1px solid var(--line);background:#fff;border-radius:999px;padding:10px 13px;color:var(--ink);font-size:.78rem;font-weight:800;box-shadow:var(--shadow)}@media(max-width:560px){.account{right:14px;top:12px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}</style><button class='account' id='accountButton' type='button'></button>");
 $("#accountButton").addEventListener("click",async()=>{if(!db){requestLogin();return}if(currentUser){authBusy=true;renderAccount();const {error}=await db.auth.signOut({scope:"local"});authBusy=false;if(error){renderAccount();toast("Nie udało się wylogować: "+error.message);return}currentUser=null;remotePlan=null;remoteShopping=null;undoShopping=null;checks={};render();toast("Wylogowano. Pokazujemy teraz plan przykładowy.")}else requestLogin()});
 $("#cancelLogin").addEventListener("click",()=>closeLogin());
+$("#forgotPassword").addEventListener("click",()=>chooseLoginMethod("password-reset"));
+$("#useEmailLogin").addEventListener("click",()=>chooseLoginMethod("email"));
+$("#backToPassword").addEventListener("click",()=>chooseLoginMethod("password"));
+$("#settings .explainer").insertAdjacentHTML("beforeend",'<button class="secondary" id="passwordManage" type="button" hidden>Ustaw / zmień hasło do konta</button>');
+$("#passwordManage").addEventListener("click",openPasswordEditor);
 $("#changeLoginEmail").addEventListener("click",()=>{if(authBusy)return;loginStep="email";loginPendingEmail="";$("#loginCode").value="";loginMessage("");renderLogin();$("#loginEmail").focus()});
 $("#resendLoginCode").addEventListener("click",()=>sendLoginCode(loginPendingEmail));
 $("#loginEmail").addEventListener("input",()=>{loginMessage("");renderLogin()});
-$("#loginForm").addEventListener("submit",e=>{e.preventDefault();if(loginStep==="code")verifyLoginCode($("#loginCode").value);else sendLoginCode($("#loginEmail").value)});
+$("#loginForm").addEventListener("submit",e=>{e.preventDefault();if(passwordAuthEnabled&&loginMethod==="password")return signInWithPassword($("#loginEmail").value,$("#loginPassword").value);if(passwordAuthEnabled&&loginMethod==="password-reset")return requestPasswordReset($("#loginEmail").value);if(passwordAuthEnabled&&loginMethod==="password-update")return saveAccountPassword($("#loginPassword").value,$("#loginPasswordConfirm").value);if(loginStep==="code")return verifyLoginCode($("#loginCode").value);return sendLoginCode($("#loginEmail").value)});
 $("#planNoticeAction").addEventListener("click",async()=>{if(!remotePlan)navigate("settings");else{navigate("dashboard");if(await generatePlan())navigate("day")}});
 $("#shoppingFilter").addEventListener("change",updateShoppingState);
 $("#discardSettings").addEventListener("click",()=>{settingsDirty=false;renderSettings();$("#saveStatus").textContent="Odrzucono niezapisane zmiany.";$("#generationStatus").hidden=true});
@@ -200,7 +307,7 @@ $("#skipContent").addEventListener("click",e=>{e.preventDefault();navigate(readR
 document.addEventListener("keydown",trapLoginFocus);
 window.addEventListener("popstate",applyRoute);
 window.addEventListener("hashchange",applyRoute);
-window.addEventListener("beforeunload",event=>{if(settingsDirty){event.preventDefault();event.returnValue=""}});
+window.addEventListener("beforeunload",event=>{if(settingsDirty||passwordFormDirty()){event.preventDefault();event.returnValue=""}});
 render();
 initAuth();
 applyRoute();

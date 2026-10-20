@@ -22,6 +22,8 @@ jobs:
         run: node --test scripts/generate_plan.test.mjs
       - name: Sprawdź formularz logowania kodem (bez maili i sieci)
         run: node --test scripts/auth_otp.test.mjs
+      - name: Sprawdź logowanie hasłem, odzyskiwanie i sesje PWA (bez maili i sieci)
+        run: node --test scripts/auth_password.test.mjs
       - name: Sprawdź kryteria jadłospisu dnia
         run: node --test scripts/task3_acceptance.test.mjs
       - name: Sprawdź treningi, zapis ustawień i zgodność kalorii UI/Edge
