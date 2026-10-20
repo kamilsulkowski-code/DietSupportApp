@@ -28,3 +28,7 @@ jobs:
         run: node --test scripts/training_settings.test.mjs
       - name: Sprawdź stany UX, nawigację, formularz, zakupy i dostępność logowania
         run: node --test scripts/ux.test.mjs
+      - name: Sprawdź PWA, politykę cache i aktualizacje
+        run: |
+          node scripts/build_pwa.mjs --check
+          node --test scripts/pwa.test.mjs

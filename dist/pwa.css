@@ -1,0 +1,8 @@
+.pwa-actions{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.pwa-panel{margin-top:24px;border-top:1px solid #b5cdb1;padding-top:20px}
+.pwa-panel h2{font-size:1.1rem}
+.pwa-panel p,.pwa-panel li{font-size:.85rem;color:#335843}
+.pwa-panel ol{padding-left:20px}
+.pwa-panel li{margin:8px 0}
+.pwa-panel button{max-width:100%;white-space:normal}
+.pwa-network-notice button{margin-top:10px}

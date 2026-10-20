@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Forma</title>
+  <rect width="512" height="512" fill="#102f29"/>
+  <g transform="translate(76 56) scale(6)">
+    <path fill="#b7f55b" d="M51 7C23 8 9 23 9 42c0 10 7 16 15 16 21 0 29-24 27-51Z"/>
+    <path d="M19 48 39 23" fill="none" stroke="#102f29" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+</svg>
