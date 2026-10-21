@@ -1,5 +1,21 @@
 # Historia zmian
 
+## Ikony menu mobilnego — 2026-10-21, zadanie #15
+
+- Ikony pulpitu, sztućców, koszyka i ustawień nad niezmienionymi podpisami;
+  zatwierdzony wariant „Pełne wyróżnienie” z ciemnym tłem aktywnej pozycji.
+- Lokalne SVG bez CDN, dekoracyjne ikony pomijane przez czytniki ekranu,
+  widoczny fokus i większe obszary dotykowe; układ desktopowy bez zmian.
+- Safe-area oraz rezerwa mierzona z wysokości menu chronią końcową treść,
+  przewijany fokus i toasty przy zmianie ekranu lub rozmiaru tekstu.
+  Komunikaty PWA pozostają w dotychczasowym układzie strony.
+- Siedem nowych testów MOBILE15; pełna regresja przed publikacją 147/147.
+- [Wymagania #15, macierz NAV1–NAV7 i testy ręczne](docs/mobile-navigation.md).
+  Potwierdzenie CI/Pages jest rejestrowane oddzielnie w PR; kontrola Safari/PWA
+  na fizycznym iPhonie pozostaje do potwierdzenia przez użytkownika.
+- Bez zmian Auth, SQL, API generatora i nowego tagu wydania; wymagane
+  przebudowanie cache PWA przed publikacją frontendu.
+
 ## Konto i dyskretne statusy — 2026-10-21
 
 - Przycisk logowania/Konto w przewijanym nagłówku zamiast nakładki nad treścią;

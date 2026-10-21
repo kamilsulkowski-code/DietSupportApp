@@ -43,6 +43,19 @@ struktury strony oraz przegląd szerokości 320/390/768/1440 px zakończone
 powodzeniem. [Raport i ograniczenia](docs/ux-improvements.md) oddzielają te
 wyniki od potwierdzenia wdrożenia produkcyjnego zapisywanego w zadaniu #7.
 
+## Ikony menu mobilnego — zadanie #15
+
+Zatwierdzony wariant „Pełne wyróżnienie” dodaje ikony nad stałymi podpisami
+Dzisiaj, Jadłospis, Zakupy i Ustawienia, zachowując dotychczasową nawigację.
+[Zakres NAV1–NAV7, dostępność i lista regresji](docs/mobile-navigation.md)
+opisują także safe-area i odstęp chroniący treść oraz komunikaty PWA.
+Źródło: [zadanie #15](https://github.com/kamilsulkowski-code/DietSupportApp/issues/15).
+To aktualizacja frontendu na bazie 1.0.1, bez nowego tagu i zmian backendu.
+Manifest identyfikuje ją przez `mobileNavigationUpdate.id: "mobile-menu-icons"`.
+Przed publikacją zaliczono 147/147 testów, w tym siedem regresji MOBILE15.
+Wynik publikacji jest potwierdzany osobno; kontrola na fizycznym iPhonie
+w Safari i PWA wymaga jeszcze potwierdzenia użytkownika.
+
 ## PWA — instalacja aplikacji
 
 Forma ma manifest, ikony instalacyjne, obsługę ograniczonego otwierania offline
