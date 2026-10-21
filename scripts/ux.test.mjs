@@ -39,7 +39,8 @@ function domHarness(){
   closest(selector){for(let item=this;item;item=item.parentElement)if(matches(item,selector))return item;return null}
   querySelectorAll(selector){const descendants=[];const visit=element=>{for(const child of element.children){descendants.push(child);visit(child)}};visit(this);return descendants.filter(x=>matches(x,selector))}
   querySelector(selector){return this.querySelectorAll(selector)[0]||null}
-  insertAdjacentHTML(_position,value){parse(value,this)}
+  appendChild(element){if(element.parentElement){const siblings=element.parentElement.children,index=siblings.indexOf(element);if(index>=0)siblings.splice(index,1)}element.parentElement=this;this.children.push(element);return element}
+  insertAdjacentHTML(position,value){if(position==='afterend'||position==='beforebegin'){const fragment=new Element('fragment');parse(value,fragment);const parent=this.parentElement,index=parent.children.indexOf(this)+(position==='afterend'?1:0);for(const child of fragment.children)child.parentElement=parent;parent.children.splice(index,0,...fragment.children)}else parse(value,this)}
   showModal(){this.open=true;this.hidden=false}
   close(){this.open=false;this.hidden=true}
   scrollIntoView(){}
@@ -67,18 +68,20 @@ function domHarness(){
  return document;
 }
 
-function harness({loggedIn=false,plan=null,shopping=null,stored=null,profile=null,invokeError=null,invokePlan=null,hash='',passwordEnabled=false}={}){
- const document=domHarness(),storage=new Map(),calls={invoke:0,writes:[],history:[],scroll:[]},windowListeners={};
+function harness({loggedIn=false,plan=null,shopping=null,stored=null,profile=null,profileError=null,syncError=null,invokeError=null,invokePlan=null,hash='',passwordEnabled=false,online=true,mobile=false}={}){
+ const document=domHarness(),storage=new Map(),calls={invoke:0,writes:[],reads:[],history:[],scroll:[],signOut:0},windowListeners={};
  if(stored)storage.set('forma-settings',JSON.stringify(stored));
  const location={origin:'https://test.invalid',pathname:'/DietSupportApp/',hash,search:''};
  const changeLocation=url=>{const parsed=new URL(url,location.origin+location.pathname);location.hash=parsed.hash;location.search=parsed.search};
  const history={pushState:(_data,_title,url)=>{calls.history.push(['push',url]);changeLocation(url)},replaceState:(_data,_title,url)=>{calls.history.push(['replace',url]);changeLocation(url)}};
  let responsePlan=plan;
  const chain={select(){return this},eq(){return this},gte(){return this},order(){return this},limit(){return this},async maybeSingle(){return{data:responsePlan,error:null}}};
- const client={from:table=>table==='profiles'?{...chain,async maybeSingle(){return{data:profile,error:null}},upsert:async row=>{calls.writes.push(row);return{error:null}}}:table==='shopping_cycles'?{...chain,async maybeSingle(){return{data:shopping,error:null}}}:chain,
-  functions:{invoke:async()=>{calls.invoke++;if(invokeError)return{data:null,error:invokeError};responsePlan=invokePlan;return{data:{plan:invokePlan},error:null}}},auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange(listener){calls.authListener=listener},signOut:async()=>({error:null})}};
- const window={FORMA_SUPABASE:{url:'https://fake.invalid',anonKey:'isolated-test-only',passwordAuthEnabled:passwordEnabled},supabase:{createClient:()=>client},location,history,scrollTo:value=>calls.scroll.push(value),addEventListener:(type,fn)=>(windowListeners[type]??=[]).push(fn)};
- const context=vm.createContext({document,window,location,history,URL,URLSearchParams,Date,Map,Set,console,CSS:{escape:String},localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},requestAnimationFrame:fn=>fn()});
+ let profileResponse={data:profile,error:profileError},writeError=syncError;
+ const client={from:table=>table==='profiles'?{...chain,async maybeSingle(){calls.reads.push(table);return profileResponse},upsert:async row=>{calls.writes.push(JSON.parse(JSON.stringify(row)));return{error:writeError}}}:table==='shopping_cycles'?{...chain,async maybeSingle(){calls.reads.push(table);return{data:shopping,error:null}}}:{...chain,async maybeSingle(){calls.reads.push(table);return{data:responsePlan,error:null}}},
+  functions:{invoke:async()=>{calls.invoke++;if(invokeError)return{data:null,error:invokeError};responsePlan=invokePlan;return{data:{plan:invokePlan},error:null}}},auth:{getSession:async()=>({data:{session:null}}),onAuthStateChange(listener){calls.authListener=listener},signOut:async()=>{calls.signOut++;return{error:null}}}};
+ const navigator={onLine:online};
+ const window={FORMA_SUPABASE:{url:'https://fake.invalid',anonKey:'isolated-test-only',passwordAuthEnabled:passwordEnabled},supabase:{createClient:()=>client},location,history,innerWidth:mobile?390:1440,matchMedia:()=>({matches:mobile,addEventListener(){}}),scrollTo:value=>calls.scroll.push(value),addEventListener:(type,fn)=>(windowListeners[type]??=[]).push(fn)};
+ const context=vm.createContext({document,window,navigator,location,history,URL,URLSearchParams,Date,Map,Set,console,CSS:{escape:String},localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)},setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},requestAnimationFrame:fn=>fn()});
  // Avoid session restoration and network-related startup, then seed explicit fixtures.
  const bootless=application.replace(/\nrender\(\);\s*\ninitAuth\(\);/,'\n');
  assert.notEqual(bootless,application,'Boot marker changed: isolate startup before running full-script UI tests');
@@ -86,7 +89,7 @@ function harness({loggedIn=false,plan=null,shopping=null,stored=null,profile=nul
  const run=code=>vm.runInContext(code,context);
  context.fixturePlan=plan;context.fixtureShopping=shopping;
  run(`currentUser=${loggedIn?'{id:"ux-test-owner",email:"ux@example.invalid"}':'null'};remotePlan=fixturePlan;remoteShopping=fixtureShopping;${plan||invokePlan?'state={...state,goal:"keep",weight:70,protein:2,calories:2200,mealCount:2,shopDays:3};':''}`);
- return{document,$:selector=>document.querySelector(selector),storage,calls,context,windowListeners,location,run,client,setResponsePlan:plan=>{responsePlan=plan}};
+ return{document,$:selector=>document.querySelector(selector),storage,calls,context,windowListeners,location,navigator,run,client,setResponsePlan:plan=>{responsePlan=plan},setProfileResponse:response=>{profileResponse=response},setWriteError:error=>{writeError=error}};
 }
 
 function planFixture(){const fixture=task3Fixture().plan;const start=new Date();start.setHours(12,0,0,0);fixture.content.days.forEach((day,index)=>{const date=new Date(start);date.setDate(date.getDate()+index);day.date=date.toISOString().slice(0,10)});fixture.cycle_start=fixture.content.days[0].date;fixture.cycle_end=fixture.content.days.at(-1).date;fixture.created_at=new Date().toISOString();return fixture}
@@ -264,7 +267,7 @@ test('UX7: wylogowanie unieważnia cofnięcie zakupów bez zmiany danych zapisan
   await h.$('#completeShop').click();assert.ok(h.run('undoShopping'));
   if(external){await h.run('initAuth()');h.run('currentUser={id:"ux-test-owner"}')}
   const writes=h.calls.writes.length;
-  if(external)h.calls.authListener('SIGNED_OUT',null);else await h.$('#accountButton').click();
+  if(external)h.calls.authListener('SIGNED_OUT',null);else await h.$('#logoutButton').click();
   assert.equal(h.run('undoShopping'),null);assert.equal(h.run('Object.keys(checks).length'),0);
   assert.equal(h.$('#undoShop').hidden,true);assert.equal(h.calls.writes.length,writes);
   await h.$('#undoShop').click();assert.equal(h.calls.writes.length,writes);
@@ -306,6 +309,17 @@ test('UX8: zewnętrzne wylogowanie usuwa prywatny plan i zakupy z widoku',async(
  assert.match(h.$('#generateBtn').textContent,/Zaloguj/i);
 });
 
+test('ACCOUNT4: odświeżenie tokenu lub ponowne zdarzenie SIGNED_IN nie usuwa danych bieżącego konta',async()=>{
+ for(const event of ['TOKEN_REFRESHED','SIGNED_IN']){
+  const plan=planFixture(),shopping={items:[{category:'Nabiał',name:'Skyr',amount:200,unit:'g'}],promotions:[]};
+  const h=harness({plan,shopping});await h.run('initAuth()');
+  h.context.fixturePlan=plan;h.context.fixtureShopping=shopping;
+  h.run('currentUser={id:"ux-test-owner",email:"ux@example.invalid"};remotePlan=fixturePlan;remoteShopping=fixtureShopping;renderAccount()');
+  h.calls.authListener(event,{user:{id:'ux-test-owner',email:'ux@example.invalid'}});
+  assert.equal(h.run('remotePlan.id'),plan.id);assert.equal(h.run('remoteShopping.items[0].name'),'Skyr');
+ }
+});
+
 test('AUTH6: rzeczywisty formularz domyślnie loguje hasłem w tej samej sesji bez maila',async()=>{
  const h=harness({passwordEnabled:true});const requests=[];
  h.client.auth.signInWithPassword=async args=>{requests.push(args);return{data:{session:{user:{id:'ux-test-owner',email:args.email}}}}};
@@ -337,4 +351,156 @@ test('AUTH6: router nie kasuje callbacku przed inicjalizacją SDK, a szkic hasł
  h.run('requestLogin()');h.$('#loginPassword').value='fixture-only-passphrase';let prevented=false;
  h.windowListeners.beforeunload[0]({preventDefault(){prevented=true}});assert.equal(prevented,true);
  await h.$('#cancelLogin').click();assert.equal(h.$('#loginPassword').value,'');assert.equal(h.$('.shell').inert,false);
+});
+
+test('ACCOUNT1: Konto otwiera menu bez wylogowania, a sekcja konta jest po formularzu założeń',async()=>{
+ const h=harness({loggedIn:true,passwordEnabled:true});h.run('render();renderAccount()');
+ assert.equal(h.$('#accountButton').textContent,'Konto');
+ await h.$('#accountButton').click();
+ assert.equal(h.$('#accountMenu').hidden,false);assert.equal(h.calls.signOut,0);
+ assert.equal(h.run('currentUser.id'),'ux-test-owner');assert.match(h.$('#accountMenuEmail').textContent,/ux@example.invalid/);
+ await h.$('#accountSettingsAction').click();assert.equal(h.location.hash,'#settings');
+ assert.equal(h.$('#accountMenu').hidden,true);assert.equal(h.calls.signOut,0);
+ const nodes=h.document.querySelectorAll('*');
+ assert.ok(nodes.indexOf(h.$('#accountSection'))>nodes.indexOf(h.$('#settingsForm')),'Konto musi następować po Twoich założeniach w kolejności dokumentu');
+ assert.equal(h.$('#accountSection').closest('#settings'),h.$('#settings'));
+ assert.match(h.$('#accountEmail').textContent,/ux@example.invalid/);
+ assert.equal(h.$('#logoutButton').hidden,false);assert.equal(h.$('#accountLogin').hidden,true);
+});
+
+test('ACCOUNT1: kontrolka konta jest przenoszona do zwykłego nagłówka mobilnego lub widoku',()=>{
+ for(const mobile of [false,true]){
+  const h=harness({mobile});h.run('render();renderAccount()');
+  const control=h.$('#accountControl');assert.ok(control);
+  assert.equal(h.document.querySelectorAll('#accountButton').length,1);
+  if(mobile)assert.ok(control.closest('.mobile-bar'));else assert.ok(control.closest('#dashboard .topline'));
+  h.run('navigate("settings")');
+  if(mobile)assert.ok(control.closest('.mobile-bar'));else assert.ok(control.closest('#settings .topline'));
+ }
+ assert.doesNotMatch(html,/\.account(?:-control)?\s*\{[^}]*position:\s*(?:fixed|sticky)/);
+});
+
+test('ACCOUNT1: logowanie gościa działa z sekcji Konto, bez żądań ani automatycznej synchronizacji',async()=>{
+ const h=harness({passwordEnabled:true});h.run('render();renderAccount();navigate("settings")');
+ assert.equal(h.$('#accountLogin').hidden,false);assert.equal(h.$('#logoutButton').hidden,true);
+ await h.$('#accountLogin').click();assert.equal(h.$('#loginDialog').hidden,false);
+ assert.equal(h.calls.signOut,0);assert.equal(h.calls.invoke,0);assert.equal(h.calls.writes.length,0);
+});
+
+test('ACCOUNT2: sukces synchronizacji jest w Koncie, a czas ostatniego sukcesu nie zmienia się po błędzie',async()=>{
+ const h=harness({loggedIn:true});h.run('render();renderAccount()');
+ assert.equal(await h.run('syncToCloud()'),true);
+ assert.match(h.$('#accountSyncStatus').textContent,/zsynchroniz|zapisano|zapisane/i);
+ const lastSuccess=h.$('#accountSyncTime').textContent;assert.match(lastSuccess,/\d{1,2}:\d{2}/);
+ assert.equal(h.$('#syncStatus').hidden,true,'Rutynowy sukces nie może zajmować górnej przestrzeni');
+ h.setWriteError({message:'fixture network error'});assert.equal(await h.run('syncToCloud()'),false);
+ assert.equal(h.$('#accountSyncTime').textContent,lastSuccess);
+ assert.equal(h.$('#syncStatus').hidden,false);assert.match(h.$('#syncStatus').textContent,/lokal|urządzeni|synchroniz/i);
+ h.run('render();navigate("shopping");render()');assert.equal(h.$('#syncStatus').hidden,false);
+ assert.equal(h.$('#shoppingSyncStatus').hidden,false);assert.match(h.$('#shoppingSyncStatus').textContent,/lokal|urządzeni|chmur/i);
+ assert.equal(h.$('#accountSyncTime').textContent,lastSuccess);assert.equal(h.$('#syncRetry').hidden,false);
+ h.setWriteError(null);await h.$('#syncRetry').click();
+ assert.equal(h.$('#syncStatus').hidden,true);assert.equal(h.$('#syncRetry').hidden,true);
+});
+
+test('ACCOUNT2: zapis formularza potwierdza się przy Zapisz, bez dodatkowego toastu sukcesu',async()=>{
+ const h=harness();h.run('render();renderAccount()');
+ await h.$('#settingsForm').emit('submit');assert.match(h.$('#saveStatus').textContent,/Zapisano/);
+ assert.equal(h.$('#toast').classList.contains('show'),false);
+});
+
+test('ACCOUNT3: ponowienie nieudanego odczytu wykonuje odczyt, nigdy zapis danych lokalnych',async()=>{
+ const h=harness({loggedIn:true,profileError:{message:'fixture read unavailable'}});h.run('render();renderAccount()');
+ await h.run('restoreFromCloud()');assert.equal(h.calls.reads.filter(x=>x==='profiles').length,1);
+ assert.equal(h.calls.writes.length,0);assert.equal(h.$('#syncRetry').hidden,false);
+ await h.$('#syncRetry').click();assert.equal(h.calls.reads.filter(x=>x==='profiles').length,2);
+ assert.equal(h.calls.writes.length,0,'Błąd pobrania nie może być naprawiany upsertem nieznanych danych lokalnych');
+ const settings={...h.run('defaultSettings'),weight:88};h.setProfileResponse({data:{settings,shopping_state:{}},error:null});
+ await h.$('#syncRetry').click();assert.equal(h.run('state.weight'),88);assert.equal(h.calls.writes.length,0);
+ assert.equal(h.$('#syncStatus').hidden,true);assert.match(h.$('#accountSyncTime').textContent,/\d{1,2}:\d{2}/);
+});
+
+test('ACCOUNT3: tryb offline nie wysyła zmian, a ponowienie po odzyskaniu sieci jest jawne',async()=>{
+ const h=harness({loggedIn:true,online:false});h.run('render();renderAccount()');
+ assert.equal(await h.run('syncToCloud()'),false);assert.equal(h.calls.writes.length,0);
+ assert.match(h.$('#accountSyncStatus').textContent,/uwagi/i);assert.match(h.$('#syncStatus').textContent,/internet|lokal|urządzeni/i);
+ h.navigator.onLine=true;h.run('renderAccount()');assert.equal(h.calls.writes.length,0);
+ await h.$('#syncRetry').click();assert.equal(h.calls.writes.length,1);
+});
+
+test('ACCOUNT4: zmiana właściciela usuwa poprzedni czas i status synchronizacji',async()=>{
+ const h=harness({loggedIn:true});h.run('render();renderAccount()');await h.run('syncToCloud()');
+ assert.match(h.$('#accountSyncTime').textContent,/\d{1,2}:\d{2}/);
+ h.run('currentUser={id:"other-owner",email:"other@example.invalid"};renderAccount()');
+ assert.doesNotMatch(h.$('#accountSyncTime').textContent,/\d{1,2}:\d{2}/);
+ assert.doesNotMatch(h.$('#accountSyncStatus').textContent,/zsynchronizowano|zapisano w chmurze/i);
+ assert.match(h.$('#accountEmail').textContent,/other@example.invalid/);
+});
+
+test('ACCOUNT4: spóźnione pobranie poprzedniego użytkownika nie przywraca prywatnych danych',async()=>{
+ const h=harness({loggedIn:true});h.run('render();renderAccount()');
+ let complete;
+ h.client.from=table=>{assert.equal(table,'profiles');return{select(){return this},eq(){return this},maybeSingle:()=>new Promise(resolve=>{complete=resolve})}};
+ const request=h.run('restoreFromCloud()');assert.equal(typeof complete,'function');
+ h.run('currentUser={id:"other-owner",email:"other@example.invalid"};renderAccount()');
+ complete({data:{settings:{weight:199},shopping_state:{'private previous owner':true}},error:null});await request;
+ assert.notEqual(h.run('state.weight'),199);assert.equal(h.run('checks["private previous owner"]'),undefined);
+ assert.doesNotMatch(h.$('#accountSyncTime').textContent,/\d{1,2}:\d{2}/);
+ assert.equal(h.calls.writes.length,0);
+});
+
+test('ACCOUNT4: równoległe zapisy są uporządkowane i zachowują osobne migawki danych',async()=>{
+ const h=harness({loggedIn:true});h.run('render();renderAccount()');
+ let completeFirst;const writes=[];
+ h.client.from=table=>{assert.equal(table,'profiles');return{upsert:row=>{writes.push(JSON.parse(JSON.stringify(row)));if(writes.length===1)return new Promise(resolve=>{completeFirst=resolve});return Promise.resolve({error:null})}}};
+ h.run('state.weight=76');const first=h.run('syncToCloud()');await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(writes.length,1);h.run('state.weight=88');const second=h.run('syncToCloud()');await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(writes.length,1,'Drugi zapis musi poczekać na pierwszy, aby starszy wynik nie nadpisał nowszego');
+ completeFirst({error:null});await Promise.all([first,second]);
+ assert.deepEqual(writes.map(row=>row.settings.weight),[76,88]);
+ assert.equal(h.run('state.weight'),88);assert.equal(h.$('#syncStatus').hidden,true);
+});
+
+test('ACCOUNT4: zalogowanie na inne konto od razu usuwa widok danych poprzedniego właściciela',async()=>{
+ const plan=planFixture(),shopping={items:[{name:'private previous owner',amount:200,unit:'g'}],promotions:[]};
+ const h=harness({plan,shopping});await h.run('initAuth()');h.context.fixturePlan=plan;h.context.fixtureShopping=shopping;
+ h.run('currentUser={id:"previous-owner",email:"previous@example.invalid"};remotePlan=fixturePlan;remoteShopping=fixtureShopping;checks={"private previous owner":true};undoShopping={"private previous owner":false};renderAccount()');
+ h.calls.authListener('SIGNED_IN',{user:{id:'new-owner',email:'new@example.invalid'}});
+ assert.equal(h.run('currentUser.id'),'new-owner');assert.equal(h.run('remotePlan'),null);assert.equal(h.run('remoteShopping'),null);
+ assert.equal(h.run('undoShopping'),null);assert.equal(h.run('Object.keys(checks).length'),0);
+});
+
+test('ACCOUNT4: spóźnione zakończenie zapisu nie przypisuje sukcesu innemu kontu',async()=>{
+ const h=harness({loggedIn:true});h.run('render();renderAccount()');let complete;
+ h.client.from=()=>({upsert:()=>new Promise(resolve=>{complete=resolve})});
+ const request=h.run('syncToCloud()');await new Promise(resolve=>setImmediate(resolve));assert.equal(typeof complete,'function');
+ h.run('currentUser={id:"other-owner",email:"other@example.invalid"};renderAccount()');
+ complete({error:null});assert.equal(await request,false);
+ assert.doesNotMatch(h.$('#accountSyncTime').textContent,/\d{1,2}:\d{2}/);
+ assert.doesNotMatch(h.$('#accountSyncStatus').textContent,/zsynchronizowano|zapisano w chmurze/i);
+});
+
+test('ACCOUNT3: edycja podczas ponawianego odczytu nie blokuje kolejnej próby po odrzuceniu szkicu',async()=>{
+ const h=harness({loggedIn:true,profileError:{message:'fixture unavailable'}});h.run('render();renderAccount()');await h.run('restoreFromCloud()');
+ let complete,reads=0;const profile={settings:{...h.run('defaultSettings'),weight:88},shopping_state:{}};
+ h.client.from=table=>({select(){return this},eq(){return this},gte(){return this},order(){return this},limit(){return this},maybeSingle(){if(table!=='profiles')return Promise.resolve({data:null,error:null});reads++;return reads===1?new Promise(resolve=>{complete=resolve}):Promise.resolve({data:profile,error:null})}});
+ const request=h.$('#syncRetry').click();await new Promise(resolve=>setImmediate(resolve));assert.equal(typeof complete,'function');
+ h.$('#weight').value='90';await h.$('#settingsForm').emit('input');assert.equal(h.run('settingsDirty'),true);
+ complete({data:profile,error:null});await request;
+ assert.notEqual(h.run('state.weight'),88);assert.equal(h.$('#syncRetry').disabled,false);
+ assert.match(h.$('#syncStatus').textContent,/zmian|szkic/i);
+ await h.$('#discardSettings').click();await h.$('#syncRetry').click();
+ assert.equal(reads,2);assert.equal(h.run('state.weight'),88);assert.equal(h.$('#syncStatus').hidden,true);
+ assert.equal(h.calls.writes.length,0);
+});
+
+test('ACCOUNT4: odczyty kończące się w odwrotnej kolejności zachowują wyłącznie najnowszy wynik',async()=>{
+ const h=harness({loggedIn:true});h.run('render();renderAccount()');const pending=[];
+ h.client.from=table=>({select(){return this},eq(){return this},gte(){return this},order(){return this},limit(){return this},maybeSingle(){return table==='profiles'?new Promise(resolve=>pending.push(resolve)):Promise.resolve({data:null,error:null})}});
+ const first=h.run('restoreFromCloud()'),second=h.run('restoreFromCloud()');assert.equal(pending.length,2);
+ pending[1]({data:{settings:{...h.run('defaultSettings'),weight:88},shopping_state:{'new result':true}},error:null});assert.equal(await second,true);
+ const successTime=h.$('#accountSyncTime').textContent;
+ pending[0]({data:{settings:{...h.run('defaultSettings'),weight:76},shopping_state:{'old result':true}},error:null});assert.equal(await first,false);
+ assert.equal(h.run('state.weight'),88);assert.equal(h.run('checks["new result"]'),true);assert.equal(h.run('checks["old result"]'),undefined);
+ assert.equal(h.$('#accountSyncTime').textContent,successTime);assert.equal(h.$('#syncStatus').hidden,true);
 });

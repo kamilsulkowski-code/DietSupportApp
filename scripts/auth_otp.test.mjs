@@ -7,9 +7,9 @@ const html=readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
 const source=html.slice(html.indexOf('function renderLogin()'),html.indexOf('async function initAuth()'));
 function harness({send,verify}={}){
  const elements=new Map(),calls=[],messages=[];
- const $=selector=>{if(!elements.has(selector))elements.set(selector,{value:'',hidden:false,focus(){},textContent:''});return elements.get(selector)};
+ const $=selector=>{if(!elements.has(selector))elements.set(selector,{value:'',hidden:false,focus(){},textContent:'',setAttribute(){},classList:{toggle(){}}});return elements.get(selector)};
  $('#loginEmail').value='USER@example.com';$('#loginDialog').hidden=false;
- const context=vm.createContext({$,Date,Map,clearInterval(){},setInterval(){return 1},toast:message=>messages.push(message),db:{auth:{
+ const context=vm.createContext({$,Date,Map,clearInterval(){},setInterval(){return 1},ensureCloudOwner(){},renderSyncState(){},positionAccountControl(){},closeAccountMenu(){},toast:message=>messages.push(message),db:{auth:{
   signInWithOtp:async args=>{calls.push(['send',args]);return send?send(args):{error:null}},
   verifyOtp:async args=>{calls.push(['verify',args]);return verify?verify(args):{data:{session:{user:{email:args.email}}},error:null}}
  }}});

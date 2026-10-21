@@ -6,6 +6,10 @@ wyłączenia weryfikacji e-mail. Bez SMTP odzyskiwanie podlega limitom poczty.
 Wycofanie formularza: ustaw flagę na `false`, przebuduj SW i opublikuj przez PR.
 Nie usuwa to haseł ani kont ustawionych wcześniej w Supabase Auth.
 
+Konto i statusy synchronizacji: [zakres ACCOUNT1–ACCOUNT4, macierz i kontrola publikacji](account-status-ux.md).
+Rutynowy sukces jest w sekcji Konto, a błąd zapisu pozostaje przy operacji;
+nie uznawaj samego czasu poprzedniej synchronizacji za potwierdzenie zapisu.
+
 ## Publikacja
 
 1. Zmiana trafia do Pull Requesta.

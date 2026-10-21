@@ -164,10 +164,11 @@ test('PWA7: offline jest jawnie oznaczony i nie obiecuje zapisanych planów AI',
 });
 
 test('PWA7: offline blokuje logowanie, generowanie i żądanie synchronizacji przed siecią',async()=>{
- const elements=new Map(),$=key=>{if(!elements.has(key))elements.set(key,{hidden:true,textContent:'',classList:{add(){}}});return elements.get(key)};
- const lines=html.split('\n').filter(line=>['function requestLogin(','async function generatePlan(','async function syncToCloud('].some(prefix=>line.startsWith(prefix))).join('\n');
- let requests=0;const context=vm.createContext({$,navigator:{onLine:false},generatingPlan:false,currentUser:{id:'owner'},db:{from(){requests++;throw Error('network forbidden')}}});
- vm.runInContext(lines,context);vm.runInContext('requestLogin()',context);assert.match($('#generationStatus').textContent,/internet/);
+ const elements=new Map(),$=key=>{if(!elements.has(key))elements.set(key,{hidden:true,textContent:'',setAttribute(){},classList:{add(){},toggle(){}}});return elements.get(key)};
+ const cloudSource=html.slice(html.indexOf('function ensureCloudOwner()'),html.indexOf('function renderLogin()'));
+ const lines=html.split('\n').filter(line=>line.startsWith('let cloud')||['function authOnline(','function requestLogin(','async function generatePlan('].some(prefix=>line.startsWith(prefix))).join('\n');
+ let requests=0;const context=vm.createContext({$,Date,navigator:{onLine:false},authBusy:false,generatingPlan:false,state:{},checks:{},currentUser:{id:'owner'},db:{from(){requests++;throw Error('network forbidden')}}});
+ vm.runInContext(lines+'\n'+cloudSource,context);vm.runInContext('requestLogin()',context);assert.match($('#generationStatus').textContent,/internet/);
  assert.equal(await vm.runInContext('generatePlan()',context),false);assert.equal(await vm.runInContext('syncToCloud()',context),false);assert.equal(requests,0);
 });
 
