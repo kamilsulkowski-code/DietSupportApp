@@ -1,5 +1,18 @@
 # Historia zmian
 
+## Konto i dyskretne statusy — 2026-10-21
+
+- Przycisk logowania/Konto w przewijanym nagłówku zamiast nakładki nad treścią;
+  osobny panel konta z e-mailem, ustawieniami i jawnym wylogowaniem.
+- Sekcja Konto pod Twoje założenia na telefonie i komputerze, ze stanem
+  synchronizacji i czasem ostatniej udanej synchronizacji.
+- Rutynowe sukcesy synchronizacji bez szerokiego górnego banera;
+  potwierdzenie zapisu przy przycisku, trwałe błędy i świadome ponowienie.
+- Zachowane logowanie, dane i zasady synchronizacji; bez zmian SQL, Edge,
+  SMTP ani sekretów. Wymagane przebudowanie cache PWA i regresja.
+- [Zakres ACCOUNT1–ACCOUNT4 i macierz weryfikacji](docs/account-status-ux.md).
+  Wyniki testów i potwierdzenie publikacji są rejestrowane oddzielnie w PR.
+
 ## Logowanie hasłem w PWA — 2026-10-21
 
 - Domyślne logowanie e-mailem i hasłem bez opuszczania PWA; istniejące konta,

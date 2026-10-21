@@ -10,21 +10,23 @@ const lines=html.split('\n');
 function frontend({stored=null,cloud=null,syncError=false,loggedIn=false}={}) {
  const elements=new Map(),storage=new Map(),messages=[],writes=[],invocations=[];
  if(stored)storage.set('forma-settings',JSON.stringify(stored));
- const $=selector=>{if(!elements.has(selector))elements.set(selector,{value:'',textContent:'',listeners:{},classList:{add(){},remove(){}},setAttribute(){},addEventListener(event,fn){this.listeners[event]=fn}});return elements.get(selector)};
+ const $=selector=>{if(!elements.has(selector))elements.set(selector,{value:'',textContent:'',dataset:{},listeners:{},classList:{add(){},remove(){},toggle(){}},setAttribute(){},addEventListener(event,fn){this.listeners[event]=fn}});return elements.get(selector)};
  const context=vm.createContext({$, $$:()=>[],Date,console,
   localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value)},
-  currentUser:loggedIn?{id:'owner'}:null,remotePlan:null,remoteShopping:null,checks:{},generatingPlan:false,settingsDirty:false,draftGoal:null,undoShopping:null,
+  currentUser:loggedIn?{id:'owner'}:null,remotePlan:null,remoteShopping:null,checks:{},generatingPlan:false,authBusy:false,settingsDirty:false,draftGoal:null,undoShopping:null,
   db:{
    from:table=>({
     upsert:async row=>{writes.push({table,row:JSON.parse(JSON.stringify(row))});return{error:syncError?new Error('network'):null}},
-    select:()=>({eq:()=>({maybeSingle:async()=>({data:cloud?{settings:cloud,shopping_state:{}}:null})})}),
+    select(){return this},eq(){return this},gte(){return this},order(){return this},limit(){return this},maybeSingle:async()=>({data:table==='profiles'&&cloud?{settings:cloud,shopping_state:{}}:null}),
    }),
    functions:{invoke:async()=>{invocations.push(1);return{data:{plan:null},error:null}}},
   },
   toast:message=>messages.push(message),render(){},renderAccount(){},applyRoute(){},restoreRemotePlan:async()=>{},
  });
- const names=['goalName','trainingCount','calorieTarget','targetKcal','updateCalorieEstimate','renderSettings','readSettingsForm','markSettingsDirty','updateCalorieMode','settingsSignature'];
- const source=lines.filter(line=>line.startsWith('const defaultSettings=')||line.startsWith('let state=')||names.some(name=>line.startsWith('function '+name+'('))||['syncToCloud','restoreFromCloud','generatePlan'].some(name=>line.startsWith('async function '+name+'('))||line.startsWith('$("#settingsForm").addEventListener')).join('\n');
+ const names=['goalName','trainingCount','calorieTarget','targetKcal','updateCalorieEstimate','renderSettings','readSettingsForm','markSettingsDirty','updateCalorieMode','settingsSignature','authOnline','todayDate'];
+ // Exercise the actual sync helpers including their owner guards, not copied test implementations.
+ const cloudSource=html.slice(html.indexOf('function ensureCloudOwner()'),html.indexOf('function renderLogin()'));
+ const source=lines.filter(line=>line.startsWith('const defaultSettings=')||line.startsWith('let state=')||line.startsWith('let cloud')||names.some(name=>line.startsWith('function '+name+'('))||line.startsWith('async function generatePlan(')||line.startsWith('$("#settingsForm").addEventListener')).join('\n')+'\n'+cloudSource;
  vm.runInContext(source,context);vm.runInContext('renderSettings()',context);
  return{$,storage,messages,writes,invocations,context,run:code=>vm.runInContext(code,context),save:()=>$('#settingsForm').listeners.submit({preventDefault(){}})};
 }

@@ -35,6 +35,9 @@ Manifest `dist/version.json` rozróżnia aktualizację przez
 `frontendUpdate.id: "ux-7"` i bazę `releaseBaseline: "v1.0.1"`.
 Nie wymagają migracji SQL ani zmiany funkcji Edge. Testy izolowane nie
 zastępują testu z rzeczywistym logowaniem i płatnym AI ani badania użyteczności.
+[Konto i dyskretne statusy synchronizacji](docs/account-status-ux.md) opisują
+zatwierdzony układ nagłówka, sekcję Konto pod założeniami oraz trwałe błędy
+przy właściwej czynności, z macierzą wymagań ACCOUNT1–ACCOUNT4.
 Weryfikacja przed wdrożeniem: 79/79 testów (23 UX i 56 regresji), kontrola
 struktury strony oraz przegląd szerokości 320/390/768/1440 px zakończone
 powodzeniem. [Raport i ograniczenia](docs/ux-improvements.md) oddzielają te

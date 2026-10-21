@@ -9,7 +9,7 @@ const user={id:'existing-owner',email:'owner@example.invalid'};
 const fixturePassword='fixture-only-password';
 function harness({online=true,session=null,signIn,reset,update,getUser,sessionError=null,hash='',initialEvent=null}={}){
  const elements=new Map(),calls={signIn:[],reset:[],update:[],history:[],deferred:[],restores:0,toasts:[]};
- const $=key=>{if(!elements.has(key))elements.set(key,{value:'',hidden:false,focus(){},textContent:'',classList:{add(){},remove(){}}});return elements.get(key)};
+ const $=key=>{if(!elements.has(key))elements.set(key,{value:'',hidden:false,focus(){},textContent:'',setAttribute(){},classList:{add(){},remove(){},toggle(){}}});return elements.get(key)};
  $('#loginEmail').value=user.email;$('#loginDialog').hidden=false;
  let listener;
  const auth={
@@ -25,10 +25,10 @@ function harness({online=true,session=null,signIn,reset,update,getUser,sessionEr
   document:{activeElement:null},clearInterval(){},setInterval(){return 1},
   setTimeout:fn=>calls.deferred.push(fn),
   history:{replaceState:(_state,_title,url)=>{calls.history.push(url);location.hash=url.includes('#')?'#'+url.split('#')[1]:'';location.search=url.includes('?')?'?'+url.split('?')[1].split('#')[0]:''}},
-  toast:message=>calls.toasts.push(message),db:{auth},
-  render(){},applyRoute(){},restoreFromCloud:async()=>{calls.restores++},
+  toast:message=>calls.toasts.push(message),db:{auth},ensureCloudOwner(){},renderSyncState(){},positionAccountControl(){},closeAccountMenu(){},
+  defaultSettings:{},render(){},applyRoute(){},restoreFromCloud:async()=>{calls.restores++},
  });
- vm.runInContext('const passwordAuthEnabled=true,loginCodeEnabled=false;let loginMethod="password",passwordRecovery=false,authCallbackPending=hasAuthCallback();const recoveryCallbackExpected=new URLSearchParams(location.hash.slice(1)).get("type")==="recovery";let authBusy=false,generatingPlan=false,lastLoginFocus=null,loginStep="email",loginPendingEmail="",loginCooldownTimer=null,currentUser=null,remotePlan=null,remoteShopping=null,undoShopping=null,checks={};const loginResendAfter=new Map();\n'+source,context);
+ vm.runInContext('const passwordAuthEnabled=true,loginCodeEnabled=false,cloudEpoch=0;function cloudOwnerMatches(owner){return currentUser?.id===owner}let loginMethod="password",passwordRecovery=false,authCallbackPending=hasAuthCallback();const recoveryCallbackExpected=new URLSearchParams(location.hash.slice(1)).get("type")==="recovery";let authBusy=false,generatingPlan=false,lastLoginFocus=null,loginStep="email",loginPendingEmail="",loginCooldownTimer=null,currentUser=null,remotePlan=null,remoteShopping=null,undoShopping=null,checks={};const loginResendAfter=new Map();\n'+source,context);
  return{$,calls,auth,context,location,run:code=>vm.runInContext(code,context),event:(event,session)=>listener(event,session)};
 }
 
@@ -103,7 +103,7 @@ test('AUTH4: recovery listener jest podpięty przed odczytem sesji i otwiera ust
  const h=harness({hash:'#access_token=fixture-token&type=recovery',session:{user},initialEvent:'PASSWORD_RECOVERY'});await h.run('initAuth()');
  assert.equal(h.run('passwordRecovery'),true);assert.equal(h.run('loginMethod'),'password-update');assert.equal(h.$('#loginDialog').hidden,false);
  assert.equal(h.run('authCallbackPending'),false);assert.equal(h.location.hash,'#dashboard');assert.ok(h.calls.history.every(url=>!url.includes('fixture-token')));
- assert.equal(h.calls.deferred.length,1); // Cloud work is deferred outside the auth callback lock.
+ assert.equal(h.calls.deferred.length,0);assert.equal(h.calls.restores,1); // Recovery is restored by getSession, outside the auth callback lock.
 });
 test('AUTH4: sam parametr type=recovery nie autoryzuje zmiany hasła',async()=>{
  const h=harness({hash:'#type=recovery',session:null});await h.run('initAuth()');

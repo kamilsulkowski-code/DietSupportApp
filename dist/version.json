@@ -5,6 +5,12 @@
   "pullRequest": "https://github.com/kamilsulkowski-code/DietSupportApp/pull/6",
   "implementationCommit": "707312654a521cf61bf7acc8d9667d4d547b87e3",
   "backendSource": "supabase/functions/generate-plan/index.ts",
+  "accountUiUpdate": {
+    "id": "account-status-ux",
+    "date": "2026-10-21",
+    "documentation": "docs/account-status-ux.md",
+    "releaseBaseline": "v1.0.1"
+  },
   "authenticationUpdate": {
     "id": "password-pwa",
     "date": "2026-10-21",
