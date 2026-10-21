@@ -64,7 +64,7 @@ function domHarness(){
   return true;
  }
  function parse(markup,parent){const stack=[parent];for(const token of markup.match(/<!--[\s\S]*?-->|<[^>]+>|[^<]+/g)||[]){if(token.startsWith('<!--')||/^<!/i.test(token))continue;if(token.startsWith('</')){if(stack.length>1)stack.pop();continue}if(token.startsWith('<')){const tag=token.match(/^<([\w-]+)/)?.[1];if(!tag)continue;const attrs={};const rest=token.slice(tag.length+1,-1);for(const [,key,,quoted,bare]of rest.matchAll(/([\w:-]+)(?:\s*=\s*(?:(['"])(.*?)\2|([^\s>]+)))?/g))attrs[key]=decode(quoted??bare??'');const node=new Element(tag,attrs);node.parentElement=stack.at(-1);node.parentElement.children.push(node);if(!/^(?:area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i.test(tag)&&!token.endsWith('/>'))stack.push(node)}else stack.at(-1).ownText+=decode(token)}}
- document=new Element('document');document.body=new Element('body');document.body.parentElement=document;document.children.push(document.body);parse(html.match(/<body>([\s\S]*?)<script src=/)[1],document.body);document.activeElement=document.body;
+ document=new Element('document');document.documentElement=new Element('html');document.body=new Element('body');document.body.parentElement=document;document.children.push(document.body);parse(html.match(/<body>([\s\S]*?)<script src=/)[1],document.body);document.activeElement=document.body;
  return document;
 }
 
@@ -97,6 +97,118 @@ function planFixture(){const fixture=task3Fixture().plan;const start=new Date();
 test('UX0: harness executes complete production script without external scripts',()=>{
  const h=harness();assert.doesNotThrow(()=>h.run('render()'));assert.equal(h.calls.invoke,0);
  assert.ok(h.$('#generateBtn'));assert.ok(h.$('#settingsForm'));
+});
+
+test('MOBILE15: cztery pozycje menu zachowują stałe widoczne podpisy i istniejące trasy',()=>{
+ const h=harness({mobile:true});h.run('render();applyRoute()');
+ const expected=[['dashboard','Dzisiaj'],['day','Jadłospis'],['shopping','Zakupy'],['settings','Ustawienia']];
+ const buttons=h.document.querySelectorAll('.mobile-nav button');assert.equal(buttons.length,4);
+ assert.deepEqual(buttons.map(button=>[button.dataset.view,button.querySelector('.mobile-nav-label')?.textContent]),expected);
+ for(const button of buttons){
+  const label=button.querySelector('.mobile-nav-label');
+  assert.ok(label);assert.equal(label.hidden,false);assert.notEqual(label.getAttribute('aria-hidden'),'true');
+  assert.equal(button.getAttribute('aria-label'),null,'Widoczny podpis pozostaje nazwą dostępną przycisku');
+  assert.equal(button.getAttribute('tabindex'),null,'Menu korzysta z natywnych przycisków, bez dodatkowej kolejności Tab');
+ }
+});
+
+test('MOBILE15: ikony są dekoracyjnymi lokalnymi SVG bez dodatkowych punktów fokusu ani zależności sieciowych',()=>{
+ const h=harness({mobile:true});
+ for(const button of h.document.querySelectorAll('.mobile-nav button')){
+  const icons=button.querySelectorAll('svg');assert.equal(icons.length,1,button.dataset.view);
+  const icon=icons[0];assert.equal(icon.getAttribute('aria-hidden'),'true');assert.equal(icon.getAttribute('focusable'),'false');
+  assert.equal(icon.getAttribute('width'),'22');assert.equal(icon.getAttribute('height'),'22');
+  const inheritedStroke=html.match(/\.mobile-nav-icon\s*\{([^}]+)\}/)?.[1].match(/(?:^|;)\s*stroke\s*:\s*([^;]+)/)?.[1].trim();
+  assert.equal(icon.getAttribute('stroke')||inheritedStroke,'currentColor');assert.ok(icon.getAttribute('viewBox'));
+  assert.equal(icon.querySelectorAll('title,desc,a,use,image').length,0,'Ikona ma własną geometrię i nie wymaga zewnętrznego pliku');
+  for(const node of [icon,...icon.querySelectorAll('*')]){
+   assert.equal(node.getAttribute('tabindex'),null);assert.equal(node.getAttribute('aria-label'),null);
+   assert.equal(node.getAttribute('href'),null);assert.equal(node.getAttribute('xlink:href'),null);
+  }
+ }
+ const scripts=[...html.matchAll(/<script\b[^>]*\bsrc=['"]([^'"]+)/g)].map(match=>match[1]);
+ assert.ok(scripts.every(source=>!/lucide|fontawesome|font-awesome|iconify|feather/i.test(source)),'Ikony menu nie dodają biblioteki pobieranej z CDN');
+});
+
+test('MOBILE15: kliknięcie ikony, podpisu i przycisku wybiera jeden ekran bez podwójnego wpisu historii',async()=>{
+ for(const loggedIn of [false,true]){
+  const plan=planFixture(),h=harness({mobile:true,loggedIn,plan});h.run('render();applyRoute()');
+  for(const view of ['day','shopping','settings','dashboard']){
+   const button=h.$('.mobile-nav [data-view="'+view+'"]'),before=h.calls.history.length;
+   const nestedIcon=button.querySelector('svg').children[0];assert.ok(nestedIcon,'Ikona musi mieć własną geometrię');
+   await nestedIcon.click();assert.equal(h.calls.history.length,before+1);
+   assert.equal(h.$('#'+view).classList.contains('active'),true);
+   assert.equal(button.getAttribute('aria-current'),'page');assert.equal(button.classList.contains('active'),true);
+   assert.equal(h.document.querySelectorAll('.mobile-nav [aria-current="page"]').length,1);
+   assert.equal(h.document.querySelectorAll('.view.active').length,1);
+   assert.equal(h.document.activeElement,h.$('#'+view+' h1'),'Zmiana widoku przekazuje fokus do jego nagłówka');
+   await button.querySelector('.mobile-nav-label').click();await button.click();
+   assert.equal(h.calls.history.length,before+1,'Ponowne wybranie aktywnej zakładki nie powiela historii');
+  }
+  assert.equal(h.calls.invoke,0);assert.equal(h.calls.writes.length,0);assert.equal(h.calls.signOut,0);
+  assert.equal(h.run('remotePlan.id'),plan.id,'Nawigacja nie zmienia pobranego planu');
+ }
+});
+
+test('MOBILE15: Wstecz i zmiana hasha odtwarzają aktywną ikonę oraz wybrany dzień zalogowanego użytkownika',async()=>{
+ const plan=planFixture(),date=plan.content.days[2].date,h=harness({mobile:true,loggedIn:true,plan,hash:'#day?date='+date});
+ h.run('render();applyRoute()');const meals=h.$('#mealDetails').innerHTML;
+ await h.$('.mobile-nav [data-view="shopping"] svg').children[0].click();
+ const writes=h.calls.history.length;
+ h.location.hash='#day?date='+date;
+ for(const listener of h.windowListeners.popstate||[])listener({type:'popstate'});
+ assert.equal(h.run('currentPlan().date'),date);assert.equal(h.$('#mealDetails').innerHTML,meals);
+ assert.equal(h.$('.mobile-nav [data-view="day"]').getAttribute('aria-current'),'page');
+ assert.equal(h.$('#planDaySelect').value,'2');assert.equal(h.calls.history.length,writes);
+ h.location.hash='#settings';
+ for(const listener of h.windowListeners.hashchange||[])listener({type:'hashchange'});
+ assert.equal(h.$('.mobile-nav [data-view="settings"]').getAttribute('aria-current'),'page');
+ assert.equal(h.$('.mobile-nav [data-view="day"]').getAttribute('aria-current'),null);
+ await h.$('.mobile-nav [data-view="day"] .mobile-nav-label').click();
+ assert.equal(h.location.hash,'#day?date='+date);assert.equal(h.run('currentPlan().date'),date);
+ assert.equal(h.$('#mealDetails').innerHTML,meals);assert.equal(h.calls.invoke,0);assert.equal(h.calls.writes.length,0);
+});
+
+test('MOBILE15: odstęp od menu reaguje na rzeczywistą wysokość, powiększenie tekstu i powrót na desktop',()=>{
+ const h=harness({mobile:true}),nav=h.$('.mobile-nav');let height=96.3,onResize,observed;
+ nav.getBoundingClientRect=()=>({height});
+ h.context.window.ResizeObserver=class{constructor(callback){onResize=callback}observe(element){observed=element}};
+ h.run('initMobileNavigation()');
+ const measured=()=>h.document.documentElement.style['--mobile-nav-height'];
+ assert.equal(measured(),'97px','Ułamkowa wysokość jest zaokrąglana w górę, nie może zasłonić końca treści');
+ assert.equal(observed,nav);assert.equal(typeof onResize,'function');
+ height=157.7;onResize();assert.equal(measured(),'158px','Wyższe podpisy po zmianie wielkości tekstu zwiększają odstęp');
+ height=0;for(const listener of h.windowListeners.resize||[])listener({type:'resize'});
+ assert.equal(measured(),'0px','Ukryte menu po przejściu na desktop nie pozostawia mobilnego odstępu');
+});
+
+test('MOBILE15: załadowanie fontów aktualizuje odstęp także bez ResizeObserver',async()=>{
+ const h=harness({mobile:true}),nav=h.$('.mobile-nav');let height=90,fontsReady;
+ nav.getBoundingClientRect=()=>({height});
+ h.document.fonts={ready:new Promise(resolve=>{fontsReady=resolve})};
+ h.run('initMobileNavigation()');assert.equal(h.document.documentElement.style['--mobile-nav-height'],'90px');
+ height=104.4;fontsReady();await Promise.resolve();await Promise.resolve();
+ assert.equal(h.document.documentElement.style['--mobile-nav-height'],'105px');
+});
+
+test('MOBILE15: CSS zachowuje kontrast, duże pola dotyku, safe area i widoczny fokus bez ukrywania podpisów',()=>{
+ const stylesheet=html.match(/<style>([\s\S]*?)<\/style>/)[1];
+ const declarations=selector=>[...stylesheet.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  .filter(match=>match[1].trim().split(',').some(item=>item.trim()===selector))
+  .flatMap(match=>match[2].split(';').filter(Boolean).map(value=>value.split(':').map(part=>part.trim())));
+ const properties=selector=>Object.fromEntries(declarations(selector));
+ const button=properties('.mobile-nav button'),active=properties('.mobile-nav button.active');
+ assert.ok(Number.parseFloat(button['min-height'])>=68,'Dotykalny przycisk mieści ikonę i stale widoczny podpis');
+ assert.ok(/var\(--ink\)|#102f29/i.test(active.background));assert.ok(/^(?:white|#fff(?:fff)?)$/i.test(active.color));
+ const icon=properties('.mobile-nav-icon');assert.equal(icon['flex-shrink'],'0');
+ const label=properties('.mobile-nav-label');assert.notEqual(label.display,'none');assert.notEqual(label.visibility,'hidden');
+ assert.match(stylesheet,/:focus-visible\s*\{[^}]*outline\s*:\s*3px/i,'Klawiatura zachowuje widoczną obwódkę fokusu');
+ assert.match(html,/<meta\s+name="viewport"[^>]*viewport-fit=cover/);
+ assert.match(properties('.mobile-nav').padding,/env\(safe-area-inset-bottom/,'Menu rezerwuje dolny bezpieczny obszar iPhone');
+ for(const [selector,property]of [['.shell','padding-bottom'],['.toast','bottom'],['html','scroll-padding-bottom']]){
+  const value=properties(selector)[property];assert.ok(value,selector+' '+property);
+  assert.match(value,/var\(--mobile-nav-height/,'Treść, komunikaty i przewijany fokus muszą uwzględniać zmierzone menu');
+ }
 });
 
 test('UX1: zmiana założeń oznacza poprzedni plan jako nieaktualny także po ponownym renderowaniu',()=>{

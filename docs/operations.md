@@ -10,6 +10,11 @@ Konto i statusy synchronizacji: [zakres ACCOUNT1–ACCOUNT4, macierz i kontrola 
 Rutynowy sukces jest w sekcji Konto, a błąd zapisu pozostaje przy operacji;
 nie uznawaj samego czasu poprzedniej synchronizacji za potwierdzenie zapisu.
 
+Menu mobilne: [zadanie #15, wymagania NAV1–NAV7 i lista kontroli](mobile-navigation.md).
+Po zmianie wysokości menu sprawdzaj safe-area, koniec przewijanej treści,
+toasty i komunikaty PWA przy większym tekście. Publikacja wymaga nowego
+fingerprintu cache; nie wymaga wdrożenia Edge ani migracji bazy.
+
 ## Publikacja
 
 1. Zmiana trafia do Pull Requesta.
