@@ -27,8 +27,7 @@ class Element {
   setAttribute(name,value) { this.attributes[name]=String(value); }
 }
 
-function harness(scenario = 'normal') {
-  const fixture = task3Fixture(scenario);
+function harness(scenario = 'normal', fixture = task3Fixture(scenario)) {
   const elements = {};
   const NativeDate = Date;
   class TestDate extends NativeDate {
@@ -44,6 +43,20 @@ function harness(scenario = 'normal') {
   return { elements, fixture, context, run: code => vm.runInContext(code, context) };
 }
 
+function differentDayFixture(){
+ const fixture=task3Fixture(),macros=[
+  [[610,41,17.2,61.3],[290,19,12.1,24.4]],
+  [[735,53,23.4,74.1],[325,22,10.3,31.6]],
+  [[480,34,12.2,48.3],[410,29,16.5,46.4]],
+ ];
+ fixture.plan.target_kcal=3456;fixture.plan.target_protein_g=222;
+ fixture.plan.content.days.forEach((day,index)=>{
+  Object.assign(day,{total_kcal:9000+index,total_protein_g:900+index,total_fat_g:800+index,total_carbs_g:700+index});
+  day.meals.forEach((meal,mealIndex)=>{const [kcal,protein_g,fat_g,carbs_g]=macros[index][mealIndex];Object.assign(meal,{kcal,protein_g,fat_g,carbs_g})});
+ });
+ return fixture;
+}
+
 test('K1: lista zawiera wszystkie posiłki wybranego dnia', () => {
   const h = harness(); h.run('renderDay()');
   for (const meal of h.fixture.plan.content.days[0].meals) assert.ok(h.elements['#mealDetails'].innerHTML.includes(meal.name));
@@ -51,14 +64,38 @@ test('K1: lista zawiera wszystkie posiłki wybranego dnia', () => {
 });
 
 test('K1/K6: zmiana dnia zdarzeniem change aktualizuje dania, datę i sumy', () => {
-  const h = harness(); h.run('renderDay()');
+  const h = harness('normal',differentDayFixture()); h.run('renderDay()');
+  const totals=[
+    '900 kcal · 60 g białka · 29.3 g tłuszczu · 85.7 g węglowodanów',
+    '1060 kcal · 75 g białka · 33.7 g tłuszczu · 105.7 g węglowodanów',
+    '890 kcal · 63 g białka · 28.7 g tłuszczu · 94.7 g węglowodanów',
+  ];
   for (const index of [1,2,0]) {
     h.elements['#planDaySelect'].listeners.change({target:{value:String(index)}});
     assert.equal(h.run('currentPlan().date'), h.fixture.plan.content.days[index].date);
     assert.ok(h.elements['#mealDetails'].innerHTML.includes(h.fixture.plan.content.days[index].meals[0].name));
     assert.equal(h.elements['#planDaySelect'].value, String(index));
-    assert.equal(h.elements['#dayTotals'].textContent, '950 kcal · 65 g białka · 30 g tłuszczu · 80 g węglowodanów');
+    assert.equal(h.elements['#dayTotals'].textContent, totals[index]);
+    for(const meal of h.fixture.plan.content.days[index].meals){
+      for(const text of [meal.kcal+' kcal',meal.protein_g+' g białka',meal.fat_g+' g tłuszczu',meal.carbs_g+' g węglowodanów'])assert.ok(h.elements['#mealDetails'].innerHTML.includes(text),text);
+    }
   }
+});
+
+test('MACRO17: niepełny dzień nie zachowuje poprzednich sum, a zero jest prawidłowym makro',()=>{
+ const h=harness('normal',differentDayFixture());
+ delete h.context.remotePlan.content.days[1].meals[0].fat_g;
+ for(const meal of h.context.remotePlan.content.days[2].meals){meal.fat_g=0;meal.carbs_g=0}
+ h.run('renderDay()');
+ assert.equal(h.elements['#dayTotals'].textContent,'900 kcal · 60 g białka · 29.3 g tłuszczu · 85.7 g węglowodanów');
+ h.elements['#planDaySelect'].listeners.change({target:{value:'1'}});
+ assert.equal(h.elements['#dayTotals'].textContent,'1060 kcal · 75 g białka');
+ assert.match(h.elements['#dayMacroNotice'].textContent,/Starszy plan/);
+ assert.match(h.elements['#mealDetails'].innerHTML,/brak danych o tłuszczach/);
+ h.elements['#planDaySelect'].listeners.change({target:{value:'2'}});
+ assert.equal(h.elements['#dayTotals'].textContent,'890 kcal · 63 g białka · 0 g tłuszczu · 0 g węglowodanów');
+ assert.doesNotMatch(h.elements['#dayMacroNotice'].textContent,/Starszy plan/);
+ assert.doesNotMatch(h.elements['#mealDetails'].innerHTML,/brak danych/);
 });
 
 test('K2: kalorie i białko są widoczne przy każdym posiłku oraz w sumie', () => {

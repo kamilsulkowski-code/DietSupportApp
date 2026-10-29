@@ -94,6 +94,39 @@ function harness({loggedIn=false,plan=null,shopping=null,stored=null,profile=nul
 
 function planFixture(){const fixture=task3Fixture().plan;const start=new Date();start.setHours(12,0,0,0);fixture.content.days.forEach((day,index)=>{const date=new Date(start);date.setDate(date.getDate()+index);day.date=date.toISOString().slice(0,10)});fixture.cycle_start=fixture.content.days[0].date;fixture.cycle_end=fixture.content.days.at(-1).date;fixture.created_at=new Date().toISOString();return fixture}
 
+// Each day's four totals must differ, including from the saved targets and the
+// deliberately stale daily aggregates. Identical fixture days hide stale UI.
+const macroDayTotals=[
+ '900 kcal · 60 g białka · 29.3 g tłuszczu · 85.7 g węglowodanów',
+ '1060 kcal · 75 g białka · 33.7 g tłuszczu · 105.7 g węglowodanów',
+ '890 kcal · 63 g białka · 28.7 g tłuszczu · 94.7 g węglowodanów',
+];
+function macroPlanFixture(){
+ const plan=planFixture(),macros=[
+  [[610,41,17.2,61.3],[290,19,12.1,24.4]],
+  [[735,53,23.4,74.1],[325,22,10.3,31.6]],
+  [[480,34,12.2,48.3],[410,29,16.5,46.4]],
+ ];
+ plan.target_kcal=3456;plan.target_protein_g=222;
+ plan.content.days.forEach((day,index)=>{
+  Object.assign(day,{total_kcal:9000+index,total_protein_g:900+index,total_fat_g:800+index,total_carbs_g:700+index});
+  day.meals.forEach((meal,mealIndex)=>{const [kcal,protein_g,fat_g,carbs_g]=macros[index][mealIndex];Object.assign(meal,{kcal,protein_g,fat_g,carbs_g})});
+ });
+ return plan;
+}
+function assertMacroDay(h,plan,index){
+ const day=plan.content.days[index];
+ assert.equal(h.run('currentPlan().date'),day.date);
+ assert.equal(h.$('#planDaySelect').value,String(index));
+ assert.equal(h.$('#dayTotals').textContent,macroDayTotals[index]);
+ assert.equal(h.$('#dayTitle').textContent,'Jadłospis na '+new Date(day.date+'T12:00:00').toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'})+'.');
+ const cards=h.document.querySelectorAll('#mealDetails .meal-detail');assert.equal(cards.length,day.meals.length);
+ day.meals.forEach((meal,mealIndex)=>{
+  assert.ok(cards[mealIndex].textContent.includes(meal.name));
+  for(const text of [meal.kcal+' kcal',meal.protein_g+' g białka',meal.fat_g+' g tłuszczu',meal.carbs_g+' g węglowodanów'])assert.ok(cards[mealIndex].textContent.includes(text),text);
+ });
+}
+
 test('UX0: harness executes complete production script without external scripts',()=>{
  const h=harness();assert.doesNotThrow(()=>h.run('render()'));assert.equal(h.calls.invoke,0);
  assert.ok(h.$('#generateBtn'));assert.ok(h.$('#settingsForm'));
@@ -287,6 +320,69 @@ test('UX4: przycisk Dzisiaj wraca z innego dnia do dzisiejszych posiłków i akt
  assert.equal(h.$('#planDaySelect').value,'0');assert.match(h.location.hash,new RegExp(plan.content.days[0].date));
  h.$('#planDaySelect').focus();h.$('#planDaySelect').value='1';await h.$('#planDaySelect').emit('change');
  assert.equal(h.document.activeElement,h.$('#planDaySelect'));assert.equal(h.run('currentPlan().date'),plan.content.days[1].date);
+});
+
+test('MACRO17: wybór każdego dnia przelicza cztery sumy z posiłków zamiast celu lub zapisanej sumy dnia',async()=>{
+ const plan=macroPlanFixture(),h=harness({loggedIn:true,plan});h.run('render();navigate("day")');
+ assertMacroDay(h,plan,0);
+ for(const index of [1,2,0,2,1]){
+  h.$('#planDaySelect').value=String(index);await h.$('#planDaySelect').emit('change');
+  assertMacroDay(h,plan,index);assert.equal(h.location.hash,'#day?date='+plan.content.days[index].date);
+ }
+ assert.equal(h.run('state.calories'),2200);assert.equal(h.run('remotePlan.target_kcal'),3456);
+ assert.equal(h.calls.invoke,0);assert.equal(h.calls.writes.length,0);
+});
+
+test('MACRO17: poprzedni, następny i Dzisiaj aktualizują datę, dania oraz wszystkie sumy',async()=>{
+ const plan=macroPlanFixture(),h=harness({loggedIn:true,plan});h.run('render();navigate("day")');
+ assert.equal(h.$('#previousDay').disabled,true);assert.equal(h.$('#nextDay').disabled,false);
+ for(const [button,index]of [['#nextDay',1],['#nextDay',2],['#previousDay',1],['#todayDay',0]]){
+  await h.$(button).click();assertMacroDay(h,plan,index);
+  assert.equal(h.location.hash,'#day?date='+plan.content.days[index].date);
+  assert.equal(h.$('#previousDay').disabled,index===0);assert.equal(h.$('#nextDay').disabled,index===2);
+ }
+ assert.equal(h.calls.invoke,0);assert.equal(h.calls.writes.length,0);
+});
+
+test('MACRO17: data w trasie, Wstecz, hashchange i ponowne załadowanie odtwarzają zgodne sumy',async()=>{
+ const plan=macroPlanFixture(),h=harness({loggedIn:true,plan,hash:'#day?date='+plan.content.days[2].date});
+ h.run('render();applyRoute()');assertMacroDay(h,plan,2);
+ await h.$('#previousDay').click();assertMacroDay(h,plan,1);
+ const dayRoute=h.location.hash;
+ h.run('navigate("shopping");navigate("day")');assert.equal(h.location.hash,dayRoute);assertMacroDay(h,plan,1);
+ const writes=h.calls.history.length;
+ for(const [event,index]of [['popstate',2],['hashchange',0]]){
+  h.location.hash='#day?date='+plan.content.days[index].date;
+  for(const listener of h.windowListeners[event]||[])listener({type:event});
+  assertMacroDay(h,plan,index);assert.equal(h.calls.history.length,writes);
+ }
+ const reloaded=harness({loggedIn:true,plan,stored:{selectedPlanDay:0},hash:'#day?date='+plan.content.days[2].date});
+ reloaded.run('render();applyRoute()');assertMacroDay(reloaded,plan,2);
+ assert.equal(reloaded.calls.invoke,0);assert.equal(reloaded.calls.writes.length,0);
+});
+
+test('MACRO17: dzień z brakującym makro usuwa poprzednie sumy, a pełny dzień je odtwarza',async()=>{
+ const plan=macroPlanFixture();delete plan.content.days[1].meals[0].carbs_g;
+ const h=harness({loggedIn:true,plan});h.run('render();navigate("day")');assertMacroDay(h,plan,0);
+ h.$('#planDaySelect').value='1';await h.$('#planDaySelect').emit('change');
+ assert.equal(h.$('#dayTotals').textContent,'1060 kcal · 75 g białka');
+ assert.match(h.$('#dayMacroNotice').textContent,/Starszy plan/);
+ assert.match(h.$('#mealDetails').textContent,/brak danych o węglowodanach/);
+ assert.ok(h.$('#mealDetails').textContent.includes('23.4 g tłuszczu'));
+ h.$('#planDaySelect').value='2';await h.$('#planDaySelect').emit('change');assertMacroDay(h,plan,2);
+ assert.doesNotMatch(h.$('#dayMacroNotice').textContent,/Starszy plan/);
+ assert.doesNotMatch(h.$('#mealDetails').textContent,/brak danych/);
+});
+
+test('MACRO17: przykład lokalny ma jeden dzień i nie zachowuje sum makro wcześniejszego planu AI',()=>{
+ const plan=macroPlanFixture(),h=harness({plan});h.run('render();remotePlan=null;state.mealCount=4;state.generatedPlan=null;renderDay()');
+ assert.equal(h.$('#planDaySelect').disabled,true);assert.equal(h.$('#previousDay').disabled,true);
+ assert.equal(h.$('#nextDay').disabled,true);assert.equal(h.$('#todayDay').disabled,true);
+ assert.equal(h.$('#dayTotals').textContent,'2200 kcal · 140 g białka');
+ assert.match(h.$('#dayMacroNotice').textContent,/Plan lokalny.*przykład/);
+ assert.doesNotMatch(h.$('#dayTotals').textContent,/g tłuszczu|g węglowodanów/);
+ assert.match(h.$('#mealDetails').textContent,/brak danych o tłuszczach/);
+ assert.equal(h.calls.invoke,0);assert.equal(h.calls.writes.length,0);
 });
 
 test('UX5: gość widzi neutralne powitanie, plan demonstracyjny i logowanie przed generowaniem',()=>{
